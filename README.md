@@ -1,2 +1,2 @@
-# null-scanner
+# Null Scanner
 Automated Web Vulnerability Scanner
