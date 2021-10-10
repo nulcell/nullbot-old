@@ -203,7 +203,8 @@ startGfScan() {
 : 'directory brute-force'
 startBruteForce() {
 	startFunction "directory brute-force"
-	cat "$SUBS"/hosts | parallel -j 5 --bar --shuf gobuster dir -u {} -t 50 -w "$HOME"/tools/Seclists/Discovery/Web-Content/raft-medium-directories.txt -e -r -k -q -o "$DIRSCAN"/"$sub".txt
+	#cat "$SUBS"/hosts | parallel -j 5 --bar --shuf gobuster dir -u {} -t 50 -w "$HOME"/tools/SecLists/Discovery/Web-Content/raft-medium-directories.txt -e -r -k -q -o "$DIRSCAN"/"$sub".txt
+	python3 ~/tools/dirsearch/dirsearch.py -l "$SUBS"/hosts -w "$HOME"/tools/SecLists/Discovery/Web-Content/raft-medium-directories.txt -t 60 -q #-e txt,php,html -f 
 }
 
 #Needs to be checked
