@@ -4,7 +4,7 @@
 YELLOW="\033[133m"
 GREEN="\033[032m"
 RESET="\033[0m"
-VERSION="2.2"
+VERSION="0.1"
 
 : 'Display the logo'
 displayLogo() {
