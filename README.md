@@ -1,2 +1,2 @@
-# Null Scanner
-Automated Web Vulnerability Scanner
+# NullBot
+Automated Web Scanner
