@@ -68,7 +68,7 @@ gatherSubdomains() {
 	echo -e "[$GREEN+$RESET] Done, next."
 
 	startFunction "subfinder"
-	"$HOME"/go/bin/subfinder -d "$domain" -all -config "$HOME"/ReconPi/configs/config.yaml -o "$SUBS"/subfinder.txt
+	"$HOME"/go/bin/subfinder -d "$domain" -all -config "$HOME"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt
 	echo -e "[$GREEN+$RESET] Done, next."
 
 	startFunction "assetfinder"
@@ -76,7 +76,7 @@ gatherSubdomains() {
 	echo -e "[$GREEN+$RESET] Done, next."
 
 	startFunction "amass"
-	"$HOME"/go/bin/amass enum -passive -d "$domain" -config "$HOME"/ReconPi/configs/config.ini -o "$SUBS"/amassp.txt
+	"$HOME"/go/bin/amass enum -passive -d "$domain" -config "$HOME"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amassp.txt
 	echo -e "[$GREEN+$RESET] Done, next."
 
 	startFunction "findomain"
@@ -145,7 +145,7 @@ gatherIPs() {
 portScan() {
 	startFunction  "Port Scan"
 	cd "$PORTSCAN" || return
-	cat "$IPS"/"$domain"-origin-ips.txt | naabu -p - -silent -exclude-cdn -nmap -config "$HOME"/ReconPi/configs/naabu.conf -o "$PORTSCAN"/naabu
+	cat "$IPS"/"$domain"-origin-ips.txt | naabu -p - -silent -exclude-cdn -nmap -config "$HOME"/nullbot/modules/recon/configs/naabu.conf -o "$PORTSCAN"/naabu
 	mv reconpi-nmap* "$PORTSCAN"
 	cd - || return
 	echo -e "[$GREEN+$RESET] Port Scan finished"
@@ -242,7 +242,7 @@ runNuclei() {
 
 notifySlack() {
 	startFunction "Trigger Slack Notification"
-	source "$HOME"/ReconPi/configs/tokens.txt
+	source "$HOME"/nullbot/modules/recon/configs/tokens.txt
 	export SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL"
 	echo -e "ReconPi $domain scan completed!" | slackcat
 	totalsum=$(cat $SUBS/hosts | wc -l)
@@ -277,7 +277,7 @@ notifyDiscord() {
 	startFunction "Trigger Discord Notification"
 	intfiles=$(cat $NUCLEISCAN/*.txt | wc -l)
 
-	source "$HOME"/ReconPi/configs/tokens.txt
+	source "$HOME"/nullbot/modules/recon/configs/tokens.txt
 	export DISCORD_WEBHOOK_URL="$DISCORD_WEBHOOK_URL"
 
 	totalsum=$(cat $SUBS/hosts | wc -l)
@@ -310,7 +310,7 @@ notifyDiscord() {
 
 : 'Execute the main functions'
 
-source "$HOME"/ReconPi/configs/tokens.txt || return
+source "$HOME"/nullbot/modules/recon/configs/tokens.txt || return
 export SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL"
 
 startRecon
