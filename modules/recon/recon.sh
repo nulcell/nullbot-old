@@ -204,39 +204,24 @@ startGfScan() {
 startBruteForce() {
 	startFunction "directory brute-force"
 	#cat "$SUBS"/hosts | parallel -j 5 --bar --shuf gobuster dir -u {} -t 50 -w "$HOME"/tools/SecLists/Discovery/Web-Content/raft-medium-directories.txt -e -r -k -q -o "$DIRSCAN"/"$sub".txt
-	python3 ~/tools/dirsearch/dirsearch.py -l "$SUBS"/hosts -w "$HOME"/tools/SecLists/Discovery/Web-Content/raft-medium-directories.txt -t 60 -q #-e txt,php,html -f 
+	python3 ~/tools/dirsearch/dirsearch.py -l "$SUBS"/hosts -o "$DIRSCAN"/default.txt -t 100
+	#python3 ~/tools/dirsearch/dirsearch.py -l "$SUBS"/hosts -w "$HOME"/tools/SecLists/Discovery/Web-Content/raft-medium-directories.txt -o "$DIRSCAN"/raft-dir.txt -t 100 #-e txt,php,html -f 
 }
 
 #Needs to be checked
 : 'Check open redirects'
 startOpenRedirect() {
 	startFunction "gf open redirect"
-	cat "$SUBS"/hosts | waybackurls | httpx -silent -timeout 2 -threads 100 | gf redirect | anew "$RESULTDIR"/openredirects.txt 
+	cat "$SUBS"/hosts | gau | httpx -silent -timeout 2 -threads 100 | gf redirect | anew "$RESULTDIR"/openredirects.txt 
 	cd "$HOME" || return
 }
 
 : 'Check for Vulnerabilities'
 runNuclei() {
-	#startFunction  "Nuclei Basic-detections"
-	#nuclei -l "$SUBS"/hosts -t generic-detections/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/generic-detections.txt
-	startFunction  "Nuclei CVEs Detection"
-	nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/cves/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/cve.txt
-	startFunction  "Nuclei default-creds Check"
-	nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/default-logins/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-creds.txt
-	startFunction  "Nuclei dns check"
-	nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/dns/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/dns.txt
-	startFunction  "Nuclei files check"
-	nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/file/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/files.txt
-	startFunction  "Nuclei Panels Check"
-	nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/exposed-panels/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/panels.txt
-	startFunction  "Nuclei Security-misconfiguration Check"
-	nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/misconfiguration/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/security-misconfiguration.txt
-	startFunction  "Nuclei Technologies Check"
-	nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/technologies/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/technologies.txt
-	startFunction  "Nuclei Tokens Check"
-	nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/token-spray/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/tokens.txt
-	startFunction  "Nuclei Vulnerabilties Check"
-	nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/vulnerabilities/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/vulnerabilties.txt
+	startFunction  "Nuclei Defaults Scan"
+	nuclei -l "$SUBS"/hosts -c 100 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-scan.txt
+	#startFunction  "Nuclei Custom Detection"
+	#nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/cves/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/cve.txt
 	echo -e "[$GREEN+$RESET] Nuclei Scan finished"
 }
 
@@ -326,6 +311,7 @@ fetchArchive
 fetchEndpoints
 startGfScan
 gatherScreenshots
+startOpenRedirect
 runNuclei
 portScan
 startBruteForce
