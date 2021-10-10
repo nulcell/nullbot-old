@@ -145,8 +145,7 @@ gatherIPs() {
 portScan() {
 	startFunction  "Port Scan"
 	cd "$PORTSCAN" || return
-	cat "$IPS"/"$domain"-origin-ips.txt | naabu -p - -silent -exclude-cdn -nmap -config "$HOME"/nullbot/modules/recon/configs/naabu.conf -o "$PORTSCAN"/naabu
-	mv reconpi-nmap* "$PORTSCAN"
+	naabu -p - -silent -exclude-cdn -nmap -config "$HOME"/nullbot/modules/recon/configs/naabu.conf -o "$PORTSCAN"/naabu -iL "$SUBS"/alive_subdomains
 	cd - || return
 	echo -e "[$GREEN+$RESET] Port Scan finished"
 }
