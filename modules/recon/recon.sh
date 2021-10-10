@@ -137,7 +137,7 @@ getCNAME() {
 gatherIPs() {
 	startFunction "dnsprobe"
 	dnsprobe -l "$SUBS"/subdomains -silent -f ip | sort -u | tee "$IPS"/"$domain"-ips.txt
-	python3 $HOME/ReconPi/scripts/clean_ips.py "$IPS"/"$domain"-ips.txt "$IPS"/"$domain"-origin-ips.txt
+	python3 $HOME/nullbot/modules/recon/scripts/clean_ips.py "$IPS"/"$domain"-ips.txt "$IPS"/"$domain"-origin-ips.txt
 	echo -e "[$GREEN+$RESET] Done."
 }
 
@@ -288,7 +288,7 @@ notifyDiscord() {
 		fi
 	done
 
-	python3 $HOME/ReconPi/scripts/webhook_Discord.py <<< $(echo "$message")
+	python3 $HOME/nullbot/modules/recon/scripts/webhook_Discord.py <<< $(echo "$message")
 
 	echo -e "[$GREEN+$RESET] Done."
 }
