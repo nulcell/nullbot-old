@@ -183,21 +183,11 @@ fetchEndpoints() {
 	echo -e "[$GREEN+$RESET] fetchEndpoints finished"
 }
 
-: 'Gather information with meg'
-startMeg() {
-	startFunction "meg"
-	cd "$SUBS" || return
-	meg -d 1000 -v /
-	mv out meg
-	cd "$HOME" || return
-}
-
 : 'Use gf to find secrets in responses'
-startGfScan() {
-	startFunction "Checking for secrets using gf"
-	cd "$SUBS"/meg || return
-	for i in `gf -list`; do [[ ${i} =~ "_secrets"* ]] && gf ${i} >> "$GFSCAN"/"${i}".txt; done
-	cd "$HOME" || return
+startGfScan() {	
+	startFunction "Checking for vulnerabilites using gf"
+	cat "$ARCHIVE"/getallurls.txt | httpx -silent -timeout 2 -threads 100 > /tmp/gf-vuln
+	for i in `gf -list`; do cat /tmp/gf-vuln | gf ${i} | anew "$GFSCAN"/my-"${i}".txt; done
 }
 
 : 'directory brute-force'
@@ -208,18 +198,11 @@ startBruteForce() {
 	#python3 ~/tools/dirsearch/dirsearch.py -l "$SUBS"/hosts -w "$HOME"/tools/SecLists/Discovery/Web-Content/raft-medium-directories.txt -o "$DIRSCAN"/raft-dir.txt -t 100 #-e txt,php,html -f 
 }
 
-#Needs to be checked
-: 'Check open redirects'
-startOpenRedirect() {
-	startFunction "gf open redirect"
-	cat "$ARCHIVE"/getallurls.txt | httpx -silent -timeout 2 -threads 100 | gf redirect | anew "$RESULTDIR"/openredirects.txt 
-	cd "$HOME" || return
-}
-
 : 'Check for Vulnerabilities'
 runNuclei() {
 	startFunction  "Nuclei Defaults Scan"
-	nuclei -l "$SUBS"/hosts -c 100 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-scan.txt
+	nuclei -l "$SUBS"/hosts -c 100 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info
+	nuclei -l "$SUBS"/hosts -c 100 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical
 	#startFunction  "Nuclei Custom Detection"
 	#nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/cves/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/cve.txt
 	echo -e "[$GREEN+$RESET] Nuclei Scan finished"
@@ -306,14 +289,12 @@ gatherSubdomains
 checkTakeovers
 getCNAME
 gatherIPs
-startMeg
 fetchArchive
 fetchEndpoints
 startGfScan
 gatherScreenshots
-startOpenRedirect
 runNuclei
 portScan
-startBruteForce
+#startBruteForce
 #notifySlack
 #notifyDiscord
