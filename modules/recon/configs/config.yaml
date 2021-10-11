@@ -11,18 +11,19 @@ resolvers:
     - 208.67.220.220
 sources:
     - alienvault
-    - binaryedge
+    - anubis
     - bufferover
     - certspotter
-    - certspotterold
     - censys
     - chaos
+    - chinaz
     - crtsh
     - dnsdumpster
     - hackertarget
     - intelx
-    - ipv4info
     - passivetotal
+    - robtex
+    - riddler
     - securitytrails
     - shodan
     - spyse
@@ -30,62 +31,71 @@ sources:
     - threatcrowd
     - threatminer
     - virustotal
+    - fofa
 all-sources:
     - alienvault
+    - anubis
     - archiveis
     - binaryedge
     - bufferover
     - censys
     - certspotter
-    - certspotterold
     - chaos
     - commoncrawl
     - crtsh
     - dnsdumpster
     - dnsdb
-    - entrust
     - github
     - hackertarget
-    - ipv4info
     - intelx
     - passivetotal
     - rapiddns
+    - riddler
     - recon
+    - robtex
     - securitytrails
     - shodan
     - sitedossier
+    - sonarsearch
     - spyse
     - sublist3r
+    - threatbook
     - threatcrowd
     - threatminer
     - virustotal
     - waybackarchive
     - zoomeye
+    - fofa
 recursive:
     - alienvault
+    - binaryedge
     - bufferover
     - certspotter
-    - certspotterold
     - crtsh
     - dnsdumpster
     - hackertarget
-    - ipv4info
     - passivetotal
     - securitytrails
+    - sonarsearch
     - sublist3r
     - virustotal
 binaryedge: []
 censys: []
 certspotter: []
 chaos: []
+chinaz: []
 dnsdb: []
 github: []
 intelx: []
 passivetotal: []
+recon: []
+robtex: []
 securitytrails: []
 shodan: []
 spyse: []
+threatbook: []
 urlscan: []
 virustotal: []
 zoomeye: []
-subfinder-version: 2.4.0
+fofa: []
+subfinder-version: v2.4.9
