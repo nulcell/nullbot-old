@@ -188,6 +188,7 @@ startGfScan() {
 	startFunction "Checking for vulnerabilites using gf"
 	cat "$ARCHIVE"/getallurls.txt | httpx -silent -timeout 2 -threads 100 > /tmp/gf-vuln
 	for i in `gf -list`; do cat /tmp/gf-vuln | gf ${i} | anew "$GFSCAN"/my-"${i}".txt; done
+	rm /tmp/gf-vuln
 }
 
 : 'directory brute-force'
@@ -291,8 +292,8 @@ getCNAME
 gatherIPs
 fetchArchive
 fetchEndpoints
-startGfScan
-gatherScreenshots
+#startGfScan
+#gatherScreenshots
 runNuclei
 portScan
 #startBruteForce
