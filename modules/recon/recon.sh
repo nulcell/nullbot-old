@@ -181,22 +181,22 @@ runNuclei() {
 notifySlack() {
 	startFunction "Trigger Slack Notification"
 
-	echo -e "NullBot recon on $domain completed!" | slackcat
+	echo -e "NullBot recon on $domain completed!" | slackcat -u $SLACK_WEBHOOK_URL
 	totalsum=$(cat $SUBS/hosts | wc -l)
-	echo -e "$totalsum live subdomain hosts discovered" | slackcat
+	echo -e "$totalsum live subdomain hosts discovered" | slackcat -u $SLACK_WEBHOOK_URL
 
 	posibbletko="$(cat $SUBS/takeovers | wc -l)"
 	if [ -s "$SUBS/takeovers" ]; then
-        	echo -e "Found $posibbletko possible subdomain takeovers." | slackcat
+        	echo -e "Found $posibbletko possible subdomain takeovers." | slackcat -u $SLACK_WEBHOOK_URL
 	else
-        	echo "No subdomain takeovers found." | slackcat
+        	echo "No subdomain takeovers found." | slackcat -u $SLACK_WEBHOOK_URL
 	fi
 
 	if [ -f "$NUCLEISCAN/default-vulns.txt" ]; then
 		echo "exploits discovered:" | slackcat
-		cat "$NUCLEISCAN/default-vulns.txt" | slackcat
+		cat "$NUCLEISCAN/default-vulns.txt" | slackcat -u $SLACK_WEBHOOK_URL
 	else
-		echo -e "No exploits discovered." | slackcat
+		echo -e "No exploits discovered." | slackcat -u $SLACK_WEBHOOK_URL
 	fi
 
 	echo -e "[$GREEN+$RESET] Done."
@@ -237,8 +237,6 @@ notifyDiscord() {
 : 'Execute the main functions'
 
 source "$HOME"/nullbot/modules/recon/configs/tokens
-export SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL"
-#export DISCORD_WEBHOOK_URL="$DISCORD_WEBHOOK_URL"
 
 checkArguments
 checkDirectories
