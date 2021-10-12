@@ -6,27 +6,13 @@ GREEN="\033[0;32m"
 RESET="\033[0m"
 domain="$1"
 RESULTDIR="$HOME/assets/$domain"
-WORDLIST="$RESULTDIR/wordlists"
 SCREENSHOTS="$RESULTDIR/screenshots"
 SUBS="$RESULTDIR/subdomains"
-DIRSCAN="$RESULTDIR/directories"
 GFSCAN="$RESULTDIR/gfscan"
 IPS="$RESULTDIR/ips"
 PORTSCAN="$RESULTDIR/portscan"
 ARCHIVE="$RESULTDIR/archive"
 NUCLEISCAN="$RESULTDIR/nucleiscan"
-VERSION="0.1"
-
-: 'Display the logo'
-startRecon() {
-	echo -e "
-----------------------------------------
-NullBot Recon
-v$VERSION - $YELLOW@NullCell8822$RESET
-
-modified form ReconPi - https://github.com/x1mdev/ReconPi
-----------------------------------------"
-}
 
 startFunction() {
 	tool=$1
@@ -44,13 +30,13 @@ checkArguments() {
 checkDirectories() {
 	echo -e "[$GREEN+$RESET] Creating directories and grabbing wordlists for $GREEN$domain$RESET.."
 	mkdir -p "$RESULTDIR"
-	mkdir -p "$SUBS" "$SCREENSHOTS" "$DIRSCAN" "$IPS" "$PORTSCAN" "$ARCHIVE" "$NUCLEISCAN" "$GFSCAN"
+	mkdir -p "$SUBS" "$SCREENSHOTS" "$IPS" "$PORTSCAN" "$ARCHIVE" "$NUCLEISCAN" "$GFSCAN"
 }
 
 : 'Gather resolvers'
 gatherResolvers() {
 	startFunction "Downloading fresh resolvers"
-	wget https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt -O "$IPS"/resolvers.txt
+	wget -q https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt -O "$IPS"/resolvers.txt
 }
 
 : 'subdomain gathering'
@@ -59,7 +45,7 @@ gatherSubdomains() {
 	echo -e "[$GREEN+$RESET] Checking for existing sublert output, otherwise add it."
 	if [ ! -e "$SUBS"/sublert.txt ]; then
 		cd "$HOME"/tools/sublert || return
-		yes | python3 sublert.py -u "$domain"
+		python3 sublert.py -q False -u "$domain" 2>/dev/null 1>/dev/null
 		cp "$HOME"/tools/sublert/output/"$domain".txt "$SUBS"/sublert.txt
 		cd "$HOME" || return
 	else
@@ -68,7 +54,7 @@ gatherSubdomains() {
 	echo -e "[$GREEN+$RESET] Done, next."
 
 	startFunction "subfinder"
-	"$HOME"/go/bin/subfinder -d "$domain" -all -config "$HOME"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt
+	"$HOME"/go/bin/subfinder -silent -d "$domain" -all -config "$HOME"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt 1>/dev/null 2>/dev/null
 	echo -e "[$GREEN+$RESET] Done, next."
 
 	startFunction "assetfinder"
@@ -76,15 +62,15 @@ gatherSubdomains() {
 	echo -e "[$GREEN+$RESET] Done, next."
 
 	startFunction "amass"
-	"$HOME"/go/bin/amass enum -passive -d "$domain" -config "$HOME"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amassp.txt
+	"$HOME"/go/bin/amass enum -silent -passive -d "$domain" -config "$HOME"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amassp.txt
 	echo -e "[$GREEN+$RESET] Done, next."
 
 	startFunction "findomain"
-	findomain -t "$domain" -u "$SUBS"/findomain_subdomains.txt
+	findomain -q -t "$domain" -u "$SUBS"/findomain_subdomains.txt 2>/dev/null 1>/dev/null
 	echo -e "[$GREEN+$RESET] Done, next."
 
 	startFunction "rapiddns"
-	crobat -s "$domain" | sort -u | tee "$SUBS"/rapiddns_subdomains.txt
+	crobat -s "$domain" | sort -u | anew -q "$SUBS"/rapiddns_subdomains.txt
 	echo -e "[$GREEN+$RESET] Done, next."
 
 	echo -e "[$GREEN+$RESET] Combining and sorting results.."
@@ -92,15 +78,15 @@ gatherSubdomains() {
 	echo -e "[$GREEN+$RESET] Resolving subdomains.."
 	cat "$SUBS"/subdomains | sort -u | shuffledns -silent -d "$domain" -r "$IPS"/resolvers.txt > "$SUBS"/alive_subdomains
 	echo -e "[$GREEN+$RESET] Getting alive hosts.."
-	httpx -l "$SUBS"/subdomains -silent -threads 9000 -timeout 30 | anew "$SUBS"/hosts
-	cat "$SUBS"/alive_subdomains | "$HOME"/go/bin/httprobe | tee "$SUBS"/hosts_httprobe
+	#httpx -l "$SUBS"/subdomains -silent -threads 9000 -timeout 30 | anew -q "$SUBS"/hosts_httpx
+	cat "$SUBS"/alive_subdomains | httprobe | anew -q "$SUBS"/hosts
 	echo -e "[$GREEN+$RESET] Done."
 }
 
 : 'subdomain takeover check'
 checkTakeovers() {
 	startFunction "subjack"
-	"$HOME"/go/bin/subjack -w "$SUBS"/hosts -a -ssl -t 50 -v -c "$HOME"/go/src/github.com/haccer/subjack/fingerprints.json -o "$SUBS"/all-takeover-checks.txt -ssl
+	"$HOME"/go/bin/subjack -w "$SUBS"/hosts -a -t 50 -v -c "$HOME"/go/src/github.com/haccer/subjack/fingerprints.json -o "$SUBS"/all-takeover-checks.txt -ssl 2>/dev/null 1>/dev/null
 	grep -v "Not Vulnerable" <"$SUBS"/all-takeover-checks.txt >"$SUBS"/takeovers
 	rm "$SUBS"/all-takeover-checks.txt
 
@@ -115,7 +101,7 @@ checkTakeovers() {
 	fi
 
 	startFunction "nuclei subdomain takeover check"
-	nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/takeovers -c 50 -o "$SUBS"/nuclei-takeover-checks.txt
+	nuclei -silent -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/takeovers -c 50 -o "$SUBS"/nuclei-takeover-checks.txt 2>/dev/null 1>/dev/null
 	vulnto=$(cat "$SUBS"/nuclei-takeover-checks.txt)
 	if [[ $vulnto != "" ]]; then
 		echo -e "[$GREEN+$RESET] Possible subdomain takeovers:"
@@ -130,13 +116,13 @@ checkTakeovers() {
 : 'Get all CNAME'
 getCNAME() {
 	startFunction "dnsprobe to get CNAMEs"
-	dnsprobe -r CNAME -l "$SUBS"/subdomains -o "$SUBS"/subdomains_cname.txt
+	dnsprobe -silent -r CNAME -l "$SUBS"/subdomains -o "$SUBS"/subdomains_cname.txt
 }
 
 : 'Gather IPs with dnsprobe'
 gatherIPs() {
 	startFunction "dnsprobe"
-	dnsprobe -l "$SUBS"/subdomains -silent -f ip | sort -u | tee "$IPS"/"$domain"-ips.txt
+	dnsprobe -l "$SUBS"/subdomains -silent -f ip | sort -u | anew -q "$IPS"/"$domain"-ips.txt
 	python3 $HOME/nullbot/modules/recon/scripts/clean_ips.py "$IPS"/"$domain"-ips.txt "$IPS"/"$domain"-origin-ips.txt
 	echo -e "[$GREEN+$RESET] Done."
 }
@@ -144,28 +130,21 @@ gatherIPs() {
 : 'Portscan on found IP addresses'
 portScan() {
 	startFunction  "Port Scan"
-	cd "$PORTSCAN" || return
-	naabu -p - -silent -exclude-cdn -nmap -config "$HOME"/nullbot/modules/recon/configs/naabu.conf -o "$PORTSCAN"/naabu -iL "$SUBS"/alive_subdomains
-	cd - || return
+	nmap -sV -T4 --max-retries 2 -p- --script vulners,http-title --min-rate 100000 -iL "$SUBS"/alive_subdomains -oA "$PORTSCAN"/recon-hosts 2>/dev/null 1>/dev/null
+	#nmap -sV -T4 --max-retries 2 -p- --script vulners,http-title --min-rate 100000 -iL "$IPS"/"$domain"-ips.txt -oA "$PORTSCAN"/recon-ips 2>/dev/null 1>/dev/null
 	echo -e "[$GREEN+$RESET] Port Scan finished"
 }
 
 : 'Gather screenshots'
 gatherScreenshots() {
 	startFunction "Screenshot Gathering"
-	# Bug in aquatone, once it gets fixed, will enable aquatone on x86 also.
-	arch=`uname -m`
-	if [[ "$arch" == "x86_64" ]]; then
-        python3 $HOME/tools/EyeWitness/Python/EyeWitness.py -f "$SUBS"/hosts --no-prompt -d "$SCREENSHOTS"
-	else
-	cat "$SUBS"/hosts | aquatone -http-timeout 10000 -ports xlarge -out "$SCREENSHOTS"
-	fi
+	cat "$SUBS"/hosts | aquatone -silent -http-timeout 10000 -ports xlarge -out "$SCREENSHOTS" 2>/dev/null 1>/dev/null
 	echo -e "[$GREEN+$RESET] Screenshot Gathering finished"
 }
 
 fetchArchive() {
 	startFunction "fetchArchive"
-	cat "$SUBS"/hosts | sed 's/https\?:\/\///' | waybackurls > "$ARCHIVE"/getallurls.txt
+	cat "$SUBS"/hosts | sed 's/https\?:\/\///' | gau > "$ARCHIVE"/getallurls.txt
 	cat "$ARCHIVE"/getallurls.txt  | sort -u | unfurl --unique keys > "$ARCHIVE"/paramlist.txt
 	cat "$ARCHIVE"/getallurls.txt  | sort -u | grep -P "\w+\.js(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jsurls.txt
 	cat "$ARCHIVE"/getallurls.txt  | sort -u | grep -P "\w+\.php(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/phpurls.txt
@@ -178,7 +157,7 @@ fetchEndpoints() {
 	startFunction "fetchEndpoints"
 	for js in `cat "$ARCHIVE"/jsurls.txt`;
 	do
-		python3 "$HOME"/tools/LinkFinder/linkfinder.py -i $js -o cli | anew "$ARCHIVE"/endpoints.txt;
+		python3 "$HOME"/tools/LinkFinder/linkfinder.py -i $js -o cli | anew -q "$ARCHIVE"/endpoints.txt;
 	done
 	echo -e "[$GREEN+$RESET] fetchEndpoints finished"
 }
@@ -186,34 +165,23 @@ fetchEndpoints() {
 : 'Use gf to find secrets in responses'
 startGfScan() {	
 	startFunction "Checking for vulnerabilites using gf"
-	cat "$ARCHIVE"/getallurls.txt | httpx -silent -timeout 2 -threads 100 > /tmp/gf-vuln
-	for i in `gf -list`; do cat /tmp/gf-vuln | gf ${i} | anew "$GFSCAN"/my-"${i}".txt; done
-	rm /tmp/gf-vuln
-}
-
-: 'directory brute-force'
-startBruteForce() {
-	startFunction "directory brute-force"
-	#cat "$SUBS"/hosts | parallel -j 5 --bar --shuf gobuster dir -u {} -t 50 -w "$HOME"/tools/SecLists/Discovery/Web-Content/raft-medium-directories.txt -e -r -k -q -o "$DIRSCAN"/"$sub".txt
-	python3 ~/tools/dirsearch/dirsearch.py -l "$SUBS"/hosts -o "$DIRSCAN"/default.txt -t 100
-	#python3 ~/tools/dirsearch/dirsearch.py -l "$SUBS"/hosts -w "$HOME"/tools/SecLists/Discovery/Web-Content/raft-medium-directories.txt -o "$DIRSCAN"/raft-dir.txt -t 100 #-e txt,php,html -f 
+	cd "$ARCHIVE"
+	for i in `gf -list`; do gf ${i} getallurls.txt | anew -q "$GFSCAN"/"${i}".txt; done
+	cd -
 }
 
 : 'Check for Vulnerabilities'
 runNuclei() {
 	startFunction  "Nuclei Defaults Scan"
-	nuclei -l "$SUBS"/hosts -c 100 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info
-	nuclei -l "$SUBS"/hosts -c 100 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical
-	#startFunction  "Nuclei Custom Detection"
-	#nuclei -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/cves/ -c 50 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/cve.txt
+	nuclei -l "$SUBS"/hosts -c 100 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
+	nuclei -l "$SUBS"/hosts -c 100 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
 	echo -e "[$GREEN+$RESET] Nuclei Scan finished"
 }
 
 notifySlack() {
 	startFunction "Trigger Slack Notification"
-	source "$HOME"/nullbot/modules/recon/configs/tokens.txt
-	export SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL"
-	echo -e "ReconPi $domain scan completed!" | slackcat
+
+	echo -e "NullBot recon on $domain completed!" | slackcat
 	totalsum=$(cat $SUBS/hosts | wc -l)
 	echo -e "$totalsum live subdomain hosts discovered" | slackcat
 
@@ -225,11 +193,11 @@ notifySlack() {
         echo "No subdomain takeovers found." | slackcat
 	fi
 
-	if [ -f "$NUCLEISCAN/cve.txt" ]; then
-	echo "CVE's discovered:" | slackcat
-    cat "$NUCLEISCAN/cve.txt" | slackcat
+	if [ -f "$NUCLEISCAN/default-vulns.txt" ]; then
+	echo "exploits discovered:" | slackcat
+    cat "$NUCLEISCAN/default-vulns.txt" | slackcat
 		else 
-    echo -e "No CVE's discovered." | slackcat
+    echo -e "No exploits discovered." | slackcat
 	fi
 
 	if [ -f "$NUCLEISCAN/files.txt" ]; then
@@ -245,9 +213,6 @@ notifySlack() {
 notifyDiscord() {
 	startFunction "Trigger Discord Notification"
 	intfiles=$(cat $NUCLEISCAN/*.txt | wc -l)
-
-	source "$HOME"/nullbot/modules/recon/configs/tokens.txt
-	export DISCORD_WEBHOOK_URL="$DISCORD_WEBHOOK_URL"
 
 	totalsum=$(cat $SUBS/hosts | wc -l)
 	message="**$domain scan completed!\n $totalsum live hosts discovered.**\n"
@@ -279,10 +244,10 @@ notifyDiscord() {
 
 : 'Execute the main functions'
 
-source "$HOME"/nullbot/modules/recon/configs/tokens.txt || return
+source "$HOME"/nullbot/modules/recon/configs/tokens
 export SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL"
+export DISCORD_WEBHOOK_URL="$DISCORD_WEBHOOK_URL"
 
-startRecon
 checkArguments
 checkDirectories
 gatherResolvers
@@ -292,10 +257,9 @@ getCNAME
 gatherIPs
 fetchArchive
 fetchEndpoints
-#startGfScan
-#gatherScreenshots
+startGfScan
+gatherScreenshots
 runNuclei
 portScan
-#startBruteForce
 #notifySlack
 #notifyDiscord
