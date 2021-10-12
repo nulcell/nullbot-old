@@ -167,36 +167,36 @@ startGfScan() {
 	startFunction "Checking for vulnerabilites using gf"
 	cd "$ARCHIVE"
 	for i in `gf -list`; do gf ${i} getallurls.txt | anew -q "$GFSCAN"/"${i}".txt; done
-	cd -
+	cd ~
 }
 
 : 'Check for Vulnerabilities'
 runNuclei() {
 	startFunction  "Nuclei Defaults Scan"
-	nuclei -l "$SUBS"/hosts -c 100 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
-	nuclei -l "$SUBS"/hosts -c 100 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	nuclei -l "$SUBS"/hosts -c 100 -rl 200 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
+	nuclei -l "$SUBS"/hosts -c 100 -rl 200 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
 	echo -e "[$GREEN+$RESET] Nuclei Scan finished"
 }
 
 notifySlack() {
 	startFunction "Trigger Slack Notification"
 
-	echo -e "NullBot recon on $domain completed!" | slackcat -u $SLACK_WEBHOOK_URL
+	echo -e "NullBot recon on $domain completed!" | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	totalsum=$(cat $SUBS/hosts | wc -l)
-	echo -e "$totalsum live subdomain hosts discovered" | slackcat -u $SLACK_WEBHOOK_URL
+	echo -e "$totalsum live subdomain hosts discovered" | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 
 	posibbletko="$(cat $SUBS/takeovers | wc -l)"
 	if [ -s "$SUBS/takeovers" ]; then
-        	echo -e "Found $posibbletko possible subdomain takeovers." | slackcat -u $SLACK_WEBHOOK_URL
+        	echo -e "Found $posibbletko possible subdomain takeovers." | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	else
-        	echo "No subdomain takeovers found." | slackcat -u $SLACK_WEBHOOK_URL
+        	echo "No subdomain takeovers found." | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	fi
 
 	if [ -f "$NUCLEISCAN/default-vulns.txt" ]; then
 		echo "exploits discovered:" | slackcat
-		cat "$NUCLEISCAN/default-vulns.txt" | slackcat -u $SLACK_WEBHOOK_URL
+		cat "$NUCLEISCAN/default-vulns.txt" | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	else
-		echo -e "No exploits discovered." | slackcat -u $SLACK_WEBHOOK_URL
+		echo -e "No exploits discovered." | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	fi
 
 	echo -e "[$GREEN+$RESET] Done."
