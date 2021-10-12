@@ -94,6 +94,7 @@ golangTools() {
 	echo -e "[$GREEN+$RESET] Done."
 
 	echo -e "[$GREEN+$RESET] Installing aquatone v1.7.0.."
+	arch=`uname -m`
 	if [[ "$arch" == "x86_64" ]]; then
 		cd /tmp && wget https://github.com/michenriksen/aquatone/releases/download/v1.7.0/aquatone_linux_amd64_1.7.0.zip && unzip aquatone_linux_amd64_1.7.0.zip && chmod +x aquatone && mv aquatone ~/go/bin/ && cd -
 	else
