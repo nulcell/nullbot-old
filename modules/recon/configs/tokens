@@ -1,5 +1,5 @@
-SLACK_WEBHOOK_URL="https://hooks.slack.com/services/xxx/xxx/xxx"
-DISCORD_WEBHOOK_URL="https://discordapp.com/api/webhooks/xxx/xxx"
+SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+#DISCORD_WEBHOOK_URL="https://discordapp.com/api/webhooks/xxx/xxx"
 findomain_spyse_token=""
 findomain_virustotal_token=""
 findomain_securitytrails_token=""

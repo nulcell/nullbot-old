@@ -163,7 +163,7 @@ fetchEndpoints() {
 }
 
 : 'Use gf to find secrets in responses'
-startGfScan() {	
+startGfScan() {
 	startFunction "Checking for vulnerabilites using gf"
 	cd "$ARCHIVE"
 	for i in `gf -list`; do gf ${i} getallurls.txt | anew -q "$GFSCAN"/"${i}".txt; done
@@ -186,25 +186,17 @@ notifySlack() {
 	echo -e "$totalsum live subdomain hosts discovered" | slackcat
 
 	posibbletko="$(cat $SUBS/takeovers | wc -l)"
-	if [ -s "$SUBS/takeovers" ]
-		then
-        echo -e "Found $posibbletko possible subdomain takeovers." | slackcat
+	if [ -s "$SUBS/takeovers" ]; then
+        	echo -e "Found $posibbletko possible subdomain takeovers." | slackcat
 	else
-        echo "No subdomain takeovers found." | slackcat
+        	echo "No subdomain takeovers found." | slackcat
 	fi
 
 	if [ -f "$NUCLEISCAN/default-vulns.txt" ]; then
-	echo "exploits discovered:" | slackcat
-    cat "$NUCLEISCAN/default-vulns.txt" | slackcat
-		else 
-    echo -e "No exploits discovered." | slackcat
-	fi
-
-	if [ -f "$NUCLEISCAN/files.txt" ]; then
-	echo "files discovered:" | slackcat
-    cat "$NUCLEISCAN/files.txt" | slackcat
-		else 
-    echo -e "No files discovered." | slackcat
+		echo "exploits discovered:" | slackcat
+		cat "$NUCLEISCAN/default-vulns.txt" | slackcat
+	else
+		echo -e "No exploits discovered." | slackcat
 	fi
 
 	echo -e "[$GREEN+$RESET] Done."
@@ -246,7 +238,7 @@ notifyDiscord() {
 
 source "$HOME"/nullbot/modules/recon/configs/tokens
 export SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL"
-export DISCORD_WEBHOOK_URL="$DISCORD_WEBHOOK_URL"
+#export DISCORD_WEBHOOK_URL="$DISCORD_WEBHOOK_URL"
 
 checkArguments
 checkDirectories
@@ -261,5 +253,5 @@ startGfScan
 gatherScreenshots
 runNuclei
 portScan
-#notifySlack
+notifySlack
 #notifyDiscord
