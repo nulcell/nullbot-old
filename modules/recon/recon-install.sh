@@ -28,13 +28,7 @@ basicRequirements() {
 	export LANG=en_US.UTF-8
 	export LC_ALL=en_US.UTF-8
 	sudo apt-get update -y
-	sudo apt-get install git -y
-	git clone https://github.com/NullCell8822/nullbot.git
-	sudo apt-get install -y --reinstall build-essential
-	sudo apt install -y python3-pip
-	sudo apt install -y file
-	sudo apt-get install -y dnsutils
-	sudo apt install -y lua5.1 alsa-utils libpq5
+	sudo apt-get install -y git build-essential python3-pip file dnsutils lua5.1 alsa-utils libpq5
 	sudo apt-get autoremove -y
 	sudo apt clean
 	echo -e "[$GREEN+$RESET] Creating directories.."
@@ -127,7 +121,7 @@ golangTools() {
 	go install github.com/tomnomnom/gf@latest
 	echo 'source $GOPATH/src/github.com/tomnomnom/gf/gf-completion.bash' >> ~/.bashrc
 	cp -r $GOPATH/src/github.com/tomnomnom/gf/examples ~/.gf
-	cd "$HOME"/tools/ || return
+	cd ~/tools/ || return
 	git clone https://github.com/1ndianl33t/Gf-Patterns
 	cp Gf-Patterns/*.json ~/.gf
 	git clone https://github.com/dwisiswant0/gf-secrets
