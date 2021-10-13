@@ -173,8 +173,8 @@ startGfScan() {
 : 'Check for Vulnerabilities'
 runNuclei() {
 	startFunction  "Nuclei Defaults Scan"
-	nuclei -l "$SUBS"/hosts -c 100 -rl 200 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
-	nuclei -l "$SUBS"/hosts -c 100 -rl 200 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
+	nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
 	echo -e "[$GREEN+$RESET] Nuclei Scan finished"
 }
 
@@ -193,7 +193,7 @@ notifySlack() {
 	fi
 
 	if [ -f "$NUCLEISCAN/default-vulns.txt" ]; then
-		echo "exploits discovered:" | slackcat
+		echo "exploits discovered:" | slackcat 2>/dev/null 1>/dev/null
 		cat "$NUCLEISCAN/default-vulns.txt" | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	else
 		echo -e "No exploits discovered." | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
