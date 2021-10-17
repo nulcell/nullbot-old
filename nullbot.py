@@ -12,17 +12,17 @@ def Banner():
 def recon(domain):
     os.system('{}/modules/recon/recon.sh {}'.format(nullbot_dir, domain))
 
-def ctf(ip):
+def network(ip):
     os.system('{}/modules/ctf/ctf.sh {}'.format(nullbot_dir, ip))
 
 def main():
     # Define argument parser
-    parser = argparse.ArgumentParser(description='\033[0;34mNullBot\033[0m - \033[0;33m{}\033[0m'.format(version))
-    # Arguments that can be supplied
+    parser = argparse.ArgumentParser(description='\033[0;34mNullBot\033[0m - \033[0;33m{}\033[0m'.format(version))    
     domain_group = parser.add_mutually_exclusive_group()
+    # Arguments that can be supplied
     domain_group.add_argument('-d', '--domain', help='Target domain', dest='domain', type=str, nargs='?')
     domain_group.add_argument('-t', '--target', help='Target IP address or hostname', dest='ip', type=str, nargs='?')
-    parser.add_argument('-m', '--module', help='Module to run', dest='module', type=str, nargs='?', choices=['all','recon','ctf','redirect'], required=True)
+    parser.add_argument('-m', '--module', help='Module to run', dest='module', type=str, nargs='?', choices=['all','network','recon','redirect'], required=True)
 
     # Parse arguments
     args = parser.parse_args()
@@ -41,8 +41,8 @@ def main():
         if  args.ip == None:
             print("Error, please enter target IP address using -t/--target flag")
         else:
-            print("Running CTF Automated scan on {}".format(args.ip))
-            ctf(args.ip)
+            print("Running Network scan on {}".format(args.ip))
+            network(args.ip)
     else:
         print("\033[0;31m[x]\033[0m Invalid Arguments, check -h/--help")
 

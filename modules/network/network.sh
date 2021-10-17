@@ -5,13 +5,17 @@ RED="\033[0;31m"
 GREEN="\033[0;32m"
 RESET="\033[0m"
 ADDRESS="$1"
-RESULTDIR="$HOME/nullbot-assets/$ADDRESS"
-AQUATONE="$RESULTDIR/aquatone"
-SCANS="$RESULTDIR/scans"
-PORTSCAN="$SCANS/portscan"
-NUCLEISCAN="$SCANS/nucleiscan"
-DIRSEARCH="$SCANS/dirsearch"
-CMS="$SCANS/cms"
+
+: 'base directories'
+RESULTDIR="$HOME/nullbot/output/$ADDRESS"
+PORTSCAN="$RESULTDIR/portscan"
+
+: 'http services directories'
+HTTP="$HTTP/http"
+AQUATONE="$HTTP/aquatone"
+NUCLEISCAN="$HTTP/nucleiscan"
+DIRSEARCH="$HTTP/dirsearch"
+CMS="$HTTP/cms"
 
 notify(){
 	echo -e "$GREEN[+]$RESET $1"
@@ -33,11 +37,12 @@ checkArguments(){
 }
 
 checkDirectories(){
-	notify "Creating directories for $GREEN$ADDRESS$RESET.."
+	notify "Creating directory for $GREEN$ADDRESS$RESET.."
 	mkdir -p $RESULTDIR
-	mkdir -p $SCANS $AQUATONE $PORTSCAN $NUCLEISCAN $DIRSEARCH $CMS
+	mkdir -p $PORTSCAN $HTTP
 }
 
+: 'Core Functions'
 runPortScan(){
 	notify "Starting Nmap scan"
 	nmap -sV -T4 --max-retries 2 --min-rate 10000 -oA "$PORTSCAN"/fast $ADDRESS 2>/dev/null 1>/dev/null
@@ -45,22 +50,27 @@ runPortScan(){
 	notify "Nmap scan finished"
 }
 
+
+: 'HTTP services functions'
 runAquatone(){
 	notify "Starting Aquatone"
+	mkdir -p  $AQUATONE
 	cat "$PORTSCAN"/full.xml | aquatone -silent -http-timeout 10000 -nmap -ports xlarge -out "$AQUATONE" 2>/dev/null 1>/dev/null
 	notify "Aquatone scan finished"
 }
 
 runNuclei(){
 	notify "Starting Nuclei Default Scan"
-	nuclei -target "http://${ADDRESS}" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
-	nuclei -target "http://${ADDRESS}" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	mkdir -p $NUCLEISCAN
+	nuclei -target $ADDRESS -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
+	nuclei -target $ADDRESS -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
 	notify "Nuclei Scan finished"
 }
 
 runDirecoryScanner(){
 	notify "Starting Directory Bruteforce"
 	if [ -e /usr/share/seclists ]; then
+		mkdir -p $DIRSEARCH
 		dirsearch -q --url http://$ADDRESS/ --wordlists /usr/share/seclists/Discovery/Web-Content/raft-small-directories.txt --output "$DIRSEARCH/raft-dir.txt" 2>/dev/null 1>/dev/null
 	fi
 	notify "Directory Bruteforce finished"
@@ -72,6 +82,7 @@ runCMSScanner(){
 	if [ $CMSCHECK == 'WordPress' ]; then
 		alert "Found WordPress"
 		notify "Running wpscan on site"
+		mkdir -p $CMS
 		if [ -e $HOME/wpscan-api ] && [ -e /usr/share/seclists ]; then
 			wpscan --url http://${ADDRESS} --enumerate --plugins-detection aggressive --passwords /usr/share/seclists/Passwords/Common-Credentials/10-million-password-list-top-1000.txt --api-token `cat $HOME/wpscan-api` --output "$CMS/wpscan.txt"
 		else
@@ -83,11 +94,15 @@ runCMSScanner(){
 	notify "CMS Scanner finished"
 }
 
+scanHTTP(){
+	runAquatone
+	runNuclei
+	runCMSScanner
+	runDirecoryScanner
+}
+
 : 'Main'
 checkArguments
 checkDirectories
 runPortScan
-runAquatone
-runNuclei
-runCMSScanner
-runDirecoryScanner
+scanHTTP
