@@ -123,7 +123,7 @@ getCNAME(){
 gatherIPs(){
 	notify "Starting dnsprobe"
 	dnsprobe -l "$SUBS"/subdomains -silent -f ip | sort -u | anew -q "$IPS"/"$domain"-ips.txt
-	python3 $HOME/nullbot/modules/recon/scripts/clean_ips.py "$IPS"/"$domain"-ips.txt "$IPS"/"$domain"-origin-ips.txt
+	python3 $BASE/nullbot/modules/recon/scripts/clean_ips.py "$IPS"/"$domain"-ips.txt "$IPS"/"$domain"-origin-ips.txt
 	notify "Done."
 }
 
