@@ -5,7 +5,8 @@ YELLOW="\033[1;33m"
 GREEN="\033[0;32m"
 RESET="\033[0m"
 domain="$1"
-RESULTDIR="$HOME/tools/nullbot/output/$domain"
+BASE="$HOME/tools"
+RESULTDIR="$BASE/nullbot/output/$domain"
 SCREENSHOTS="$RESULTDIR/screenshots"
 SUBS="$RESULTDIR/subdomains"
 GFSCAN="$RESULTDIR/gfscan"
@@ -53,7 +54,7 @@ gatherSubdomains(){
 	notify "Done, next."
 
 	notify "Starting subfinder"
-	"$HOME"/go/bin/subfinder -silent -d "$domain" -all -config "$HOME"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt 1>/dev/null 2>/dev/null
+	"$HOME"/go/bin/subfinder -silent -d "$domain" -all -config "$BASE"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt 1>/dev/null 2>/dev/null
 	notify "Done, next."
 
 	notify "Starting assetfinder"
@@ -61,7 +62,7 @@ gatherSubdomains(){
 	notify "Done, next."
 
 	notify "Starting amass"
-	"$HOME"/go/bin/amass enum -silent -passive -d "$domain" -config "$HOME"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amassp.txt
+	"$HOME"/go/bin/amass enum -silent -passive -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amassp.txt
 	notify "Done, next."
 
 	notify "Starting findomain"
@@ -203,7 +204,7 @@ notifySlack(){
 
 : 'Execute the main functions'
 
-source "$HOME"/tools/nullbot/modules/recon/configs/tokens
+source ${BASE}/nullbot/modules/recon/configs/tokens
 
 checkArguments
 checkDirectories
