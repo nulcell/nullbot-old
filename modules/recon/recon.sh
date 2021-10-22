@@ -5,7 +5,7 @@ YELLOW="\033[1;33m"
 GREEN="\033[0;32m"
 RESET="\033[0m"
 domain="$1"
-RESULTDIR="$HOME/nullbot/output/$domain"
+RESULTDIR="$HOME/tools/nullbot/output/$domain"
 SCREENSHOTS="$RESULTDIR/screenshots"
 SUBS="$RESULTDIR/subdomains"
 GFSCAN="$RESULTDIR/gfscan"
@@ -14,32 +14,32 @@ PORTSCAN="$RESULTDIR/portscan"
 ARCHIVE="$RESULTDIR/archive"
 NUCLEISCAN="$RESULTDIR/nucleiscan"
 
-notify() {
+notify(){
 	echo -e "$GREEN[+]$RESET $1"
 }
 
 : 'Display help text when no arguments are given'
-checkArguments() {
+checkArguments(){
 	if [[ -z $domain ]]; then
 		notify "Usage: recon <domain.tld>"
 		exit 1
 	fi
 }
 
-checkDirectories() {
+checkDirectories(){
 	notify "Creating directories and grabbing wordlists for $GREEN$domain$RESET.."
 	mkdir -p "$RESULTDIR"
 	mkdir -p "$SUBS" "$SCREENSHOTS" "$IPS" "$PORTSCAN" "$ARCHIVE" "$NUCLEISCAN" "$GFSCAN"
 }
 
 : 'Gather resolvers'
-gatherResolvers() {
+gatherResolvers(){
 	notify "Starting Downloading fresh resolvers"
 	wget -q https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt -O "$IPS"/resolvers.txt
 }
 
 : 'subdomain gathering'
-gatherSubdomains() {
+gatherSubdomains(){
 	notify "Starting sublert"
 	notify "Checking for existing sublert output, otherwise add it."
 	if [ ! -e "$SUBS"/sublert.txt ]; then
@@ -77,13 +77,13 @@ gatherSubdomains() {
 	notify "Resolving subdomains.."
 	cat "$SUBS"/subdomains | sort -u | shuffledns -silent -d "$domain" -r "$IPS"/resolvers.txt > "$SUBS"/alive_subdomains
 	notify "Getting alive hosts.."
-	#httpx -l "$SUBS"/subdomains -silent -threads 9000 -timeout 30 | anew -q "$SUBS"/hosts_httpx
+	httpx -l "$SUBS"/subdomains -silent -threads 9000 -timeout 30 | anew -q "$SUBS"/hosts
 	cat "$SUBS"/alive_subdomains | httprobe | anew -q "$SUBS"/hosts
 	notify "Done."
 }
 
 : 'subdomain takeover check'
-checkTakeovers() {
+checkTakeovers(){
 	notify "Starting subjack"
 	"$HOME"/go/bin/subjack -w "$SUBS"/hosts -a -t 50 -v -c "$HOME"/go/src/github.com/haccer/subjack/fingerprints.json -o "$SUBS"/all-takeover-checks.txt -ssl 2>/dev/null 1>/dev/null
 	grep -v "Not Vulnerable" <"$SUBS"/all-takeover-checks.txt >"$SUBS"/takeovers
@@ -113,13 +113,13 @@ checkTakeovers() {
 }
 
 : 'Get all CNAME'
-getCNAME() {
+getCNAME(){
 	notify "Starting dnsprobe to get CNAMEs"
 	dnsprobe -silent -r CNAME -l "$SUBS"/subdomains -o "$SUBS"/subdomains_cname.txt
 }
 
 : 'Gather IPs with dnsprobe'
-gatherIPs() {
+gatherIPs(){
 	notify "Starting dnsprobe"
 	dnsprobe -l "$SUBS"/subdomains -silent -f ip | sort -u | anew -q "$IPS"/"$domain"-ips.txt
 	python3 $HOME/nullbot/modules/recon/scripts/clean_ips.py "$IPS"/"$domain"-ips.txt "$IPS"/"$domain"-origin-ips.txt
@@ -127,21 +127,21 @@ gatherIPs() {
 }
 
 : 'Portscan on found IP addresses'
-portScan() {
+portScan(){
 	startFunction  "Port Scan"
-	nmap -sV -T4 --max-retries 2 -p- --script vulners,http-title --min-rate 100000 -iL "$SUBS"/alive_subdomains -oA "$PORTSCAN"/recon-hosts 2>/dev/null 1>/dev/null
-	#nmap -sV -T4 --max-retries 2 -p- --script vulners,http-title --min-rate 100000 -iL "$IPS"/"$domain"-ips.txt -oA "$PORTSCAN"/recon-ips 2>/dev/null 1>/dev/null
+	nmap -sV -T4 --max-retries 10 -p- --script vulners,http-title --min-rate 100000 -iL "$SUBS"/alive_subdomains -oA "$PORTSCAN"/recon-hosts 2>/dev/null 1>/dev/null
+	nmap -sV -T4 --max-retries 10 -p- --script vulners,http-title --min-rate 100000 -iL "$IPS"/"$domain"-ips.txt -oA "$PORTSCAN"/recon-ips 2>/dev/null 1>/dev/null
 	notify "Port Scan finished"
 }
 
 : 'Gather screenshots'
-gatherScreenshots() {
+gatherScreenshots(){
 	notify "Starting Screenshot Gathering"
 	cat "$SUBS"/hosts | aquatone -silent -http-timeout 10000 -ports xlarge -out "$SCREENSHOTS" 2>/dev/null 1>/dev/null
 	notify "Screenshot Gathering finished"
 }
 
-fetchArchive() {
+fetchArchive(){
 	notify "Starting fetchArchive"
 	cat "$SUBS"/hosts | sed 's/https\?:\/\///' | gau > "$ARCHIVE"/getallurls.txt
 	cat "$ARCHIVE"/getallurls.txt  | sort -u | unfurl --unique keys > "$ARCHIVE"/paramlist.txt
@@ -152,7 +152,7 @@ fetchArchive() {
 	notify "fetchArchive finished"
 }
 
-fetchEndpoints() {
+fetchEndpoints(){
 	notify "Starting fetchEndpoints"
 	for js in `cat "$ARCHIVE"/jsurls.txt`;
 	do
@@ -162,7 +162,7 @@ fetchEndpoints() {
 }
 
 : 'Use gf to find secrets in responses'
-startGfScan() {
+startGfScan(){
 	notify "Starting Checking for vulnerabilites using gf"
 	cd "$ARCHIVE"
 	for i in `gf -list`; do gf ${i} getallurls.txt | anew -q "$GFSCAN"/"${i}".txt; done
@@ -170,14 +170,14 @@ startGfScan() {
 }
 
 : 'Check for Vulnerabilities'
-runNuclei() {
+runNuclei(){
 	startFunction  "Nuclei Defaults Scan"
 	nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
 	nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
 	notify "Nuclei Scan finished"
 }
 
-notifySlack() {
+notifySlack(){
 	notify "Starting Trigger Slack Notification"
 
 	echo -e "NullBot recon on $domain completed!" | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
@@ -201,38 +201,6 @@ notifySlack() {
 	notify "Done."
 }
 
-notifyDiscord() {
-	notify "Starting Trigger Discord Notification"
-	intfiles=$(cat $NUCLEISCAN/*.txt | wc -l)
-
-	totalsum=$(cat $SUBS/hosts | wc -l)
-	message="**$domain scan completed!\n $totalsum live hosts discovered.**\n"
-
-	if [ -s "$SUBS/takeovers" ]
-	then
-			posibbletko="$(cat $SUBS/takeovers | wc -l)"
-			message+="**Found $posibbletko possible subdomain takeovers.**\n"
-	else
-			message+="**No subdomain takovers found.**\n"
-	fi
-
-	cd $NUCLEISCAN
-	for file in *.txt
-	do
-		if [ -s "$file" ]
-		then
-			fileName=$(basename ${file%%.*})
-			fileNameUpper="$(tr '[:lower:]' '[:upper:]' <<< ${fileName:0:1})${fileName:1}"
-			nucleiData="$(jq -Rs . <$file | cut -c 2- | rev | cut -c 2- | rev)"
-			message+="**$fileNameUpper discovered:**\n "$nucleiData"\n"
-		fi
-	done
-
-	python3 $HOME/nullbot/modules/recon/scripts/webhook_Discord.py <<< $(echo "$message")
-
-	notify "Done."
-}
-
 : 'Execute the main functions'
 
 source "$HOME"/nullbot/modules/recon/configs/tokens
@@ -251,4 +219,3 @@ gatherScreenshots
 runNuclei
 portScan
 notifySlack
-#notifyDiscord

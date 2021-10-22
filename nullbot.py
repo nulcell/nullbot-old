@@ -13,7 +13,7 @@ def recon(domain):
     os.system('{}/modules/recon/recon.sh {}'.format(nullbot_dir, domain))
 
 def network(ip):
-    os.system('{}/modules/ctf/ctf.sh {}'.format(nullbot_dir, ip))
+    os.system('{}/modules/network/network.sh {}'.format(nullbot_dir, ip))
 
 def main():
     # Define argument parser
@@ -37,7 +37,7 @@ def main():
         else:
             print("Running Bug Bounty recon on {}".format(args.domain))
             recon(args.domain)
-    elif args.module == 'ctf':
+    elif args.module == 'network':
         if  args.ip == None:
             print("Error, please enter target IP address using -t/--target flag")
         else:
