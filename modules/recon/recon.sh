@@ -203,7 +203,7 @@ notifySlack(){
 
 : 'Execute the main functions'
 
-source "$HOME"/nullbot/modules/recon/configs/tokens
+source "$HOME"/tools/nullbot/modules/recon/configs/tokens
 
 checkArguments
 checkDirectories
