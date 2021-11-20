@@ -53,33 +53,23 @@ gatherSubdomains(){
 	fi
 	notify "Done, next."
 
-	notify "Starting subfinder"
-	"$HOME"/go/bin/subfinder -silent -d "$domain" -all -config "$BASE"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt 1>/dev/null 2>/dev/null
-	notify "Done, next."
-
 	notify "Starting assetfinder"
 	"$HOME"/go/bin/assetfinder --subs-only "$domain" >"$SUBS"/assetfinder.txt
 	notify "Done, next."
 
 	notify "Starting amass"
-	"$HOME"/go/bin/amass enum -silent -passive -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amassp.txt
-	notify "Done, next."
-
-	notify "Starting findomain"
-	findomain -q -t "$domain" -u "$SUBS"/findomain_subdomains.txt 2>/dev/null 1>/dev/null
-	notify "Done, next."
-
-	notify "Starting rapiddns"
-	crobat -s "$domain" | sort -u | anew -q "$SUBS"/rapiddns_subdomains.txt
+	"$HOME"/go/bin/amass enum -silent -brute -active -d "$domain" -o "$SUBS"/amass.txt
 	notify "Done, next."
 
 	notify "Combining and sorting results.."
-	cat "$SUBS"/*.txt | sort -u >"$SUBS"/subdomains
+	cat "$SUBS"/*.txt | sort -u > "$SUBS"/subdomains
+
 	notify "Resolving subdomains.."
 	cat "$SUBS"/subdomains | sort -u | shuffledns -silent -d "$domain" -r "$IPS"/resolvers.txt > "$SUBS"/alive_subdomains
+	
 	notify "Getting alive hosts.."
-	httpx -l "$SUBS"/subdomains -silent -threads 9000 -timeout 30 | anew -q "$SUBS"/hosts
-	cat "$SUBS"/alive_subdomains | httprobe | anew -q "$SUBS"/hosts
+	cat "$SUBS"/alive_subdomains | httprobe -p http:81 -p http:3000 -p https:3000 -p http:3001 -p https:3001 -p http:8000 -p http:8080 -p https:8443 -c 50 | anew -q "$SUBS"/hosts
+	# cat "$SUBS"/alive_subdomains | dnsgen - | httprobe -p http:81 -p http:3000 -p https:3000 -p http:3001 -p https:3001 -p http:8000 -p http:8080 -p https:8443 -c 50 | anew -q "$SUBS"/hosts
 	notify "Done."
 }
 
@@ -144,12 +134,12 @@ gatherScreenshots(){
 
 fetchArchive(){
 	notify "Starting fetchArchive"
-	cat "$SUBS"/hosts | sed 's/https\?:\/\///' | gau > "$ARCHIVE"/getallurls.txt
-	cat "$ARCHIVE"/getallurls.txt  | sort -u | unfurl --unique keys > "$ARCHIVE"/paramlist.txt
-	cat "$ARCHIVE"/getallurls.txt  | sort -u | grep -P "\w+\.js(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jsurls.txt
-	cat "$ARCHIVE"/getallurls.txt  | sort -u | grep -P "\w+\.php(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/phpurls.txt
-	cat "$ARCHIVE"/getallurls.txt  | sort -u | grep -P "\w+\.aspx(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/aspxurls.txt
-	cat "$ARCHIVE"/getallurls.txt  | sort -u | grep -P "\w+\.jsp(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jspurls.txt
+	cat "$SUBS"/hosts | sed 's/https\?:\/\///' | waybackurls > "$ARCHIVE"/urls.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | unfurl --unique keys > "$ARCHIVE"/paramlist.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.js(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jsurls.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.php(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/phpurls.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.aspx(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/aspxurls.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.jsp(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jspurls.txt
 	notify "fetchArchive finished"
 }
 
@@ -166,7 +156,7 @@ fetchEndpoints(){
 startGfScan(){
 	notify "Starting Checking for vulnerabilites using gf"
 	cd "$ARCHIVE"
-	for i in `gf -list`; do gf ${i} getallurls.txt | anew -q "$GFSCAN"/"${i}".txt; done
+	for i in `gf -list`; do gf ${i} urls.txt | anew -q "$GFSCAN"/"${i}".txt; done
 	cd ~
 }
 
@@ -185,9 +175,9 @@ notifySlack(){
 	totalsum=$(cat $SUBS/hosts | wc -l)
 	echo -e "$totalsum live subdomain hosts discovered" | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 
-	posibbletko="$(cat $SUBS/takeovers | wc -l)"
+	possibletko="$(cat $SUBS/takeovers | wc -l)"
 	if [ -s "$SUBS/takeovers" ]; then
-        	echo -e "Found $posibbletko possible subdomain takeovers." | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
+        	echo -e "Found $possibletko possible subdomain takeovers." | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	else
         	echo "No subdomain takeovers found." | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	fi
@@ -211,12 +201,14 @@ checkDirectories
 gatherResolvers
 gatherSubdomains
 checkTakeovers
-getCNAME
-gatherIPs
 fetchArchive
 fetchEndpoints
+# Create endpoint input scanner to fuzz for paramters (for POST and GET)
 startGfScan
 gatherScreenshots
 runNuclei
-portScan
+# getCNAME
+# gatherIPs
+# portScan (add an if statement to control the running)
+# run directory fuzz for sensitive data exposure
 notifySlack

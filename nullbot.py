@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os,argparse
+import subprocess,argparse
 
 nullbot_dir = "$HOME/tools/nullbot"
 version = "v0.3"
@@ -10,10 +10,10 @@ def Banner():
     print(head)
 
 def recon(domain):
-    os.system('{}/modules/recon/recon.sh {}'.format(nullbot_dir, domain))
+    subprocess.call('{}/modules/recon/recon.sh {}'.format(nullbot_dir, domain))
 
 def network(ip):
-    os.system('{}/modules/network/network.sh {}'.format(nullbot_dir, ip))
+    subprocess.call('{}/modules/network/network.sh {}'.format(nullbot_dir, ip))
 
 def main():
     # Define argument parser

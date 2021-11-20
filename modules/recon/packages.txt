@@ -1,0 +1,37 @@
+# basics
+nmap
+go
+
+# go tools
+assetfinder
+amass
+anew
+httprobe
+httpx
+subjack
+nuclei
+unfurl
+waybackurls
+gf
+slackcat
+shuffledns
+
+# python tools
+
+# other
+sublert
+linkfinder
+dirsearch
+interlace
+
+aquatone
+
+# MacOs
+## basics
+brew install nmap fping git tmux golang ruby python3
+
+## go tools
+go install github.com/haccer/subjack@latest; go install github.com/tomnomnom/httprobe@latest; go install github.com/tomnomnom/assetfinder@latest; go install github.com/tomnomnom/unfurl@latest; go install github.com/tomnomnom/waybackurls@latest; GO111MODULE=off go get -d github.com/tomnomnom/gf; go install github.com/tomnomnom/gf@latest; echo 'source $HOME/go/src/github.com/tomnomnom/gf/gf-completion.bash' >> ~/.zshrc; cp -r $HOME/go/src/github.com/tomnomnom/gf/examples ~/.gf; go install github.com/tomnomnom/anew@latest; GO111MODULE=on go get github.com/OWASP/Amass/v3/...; GO111MODULE=on go install github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest; GO111MODULE=on go install github.com/projectdiscovery/dnsprobe@latest; GO111MODULE=on go install github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest; go install github.com/dwisiswant0/slackcat@latest; python3 -m pip install pysqlcipher3; gem install --user-install wpscan; nuclei -update-templates;
+
+## others
+
