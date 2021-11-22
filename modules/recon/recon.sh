@@ -30,17 +30,19 @@ checkArguments(){
 checkDirectories(){
 	notify "Creating directories and grabbing wordlists for $GREEN$domain$RESET.."
 	mkdir -p "$RESULTDIR"
-	mkdir -p "$SUBS" "$SCREENSHOTS" "$IPS" "$PORTSCAN" "$ARCHIVE" "$NUCLEISCAN" "$GFSCAN"
+	mkdir -p "$SUBS" "$SCREENSHOTS" "$IPS" "$ARCHIVE" "$NUCLEISCAN" "$GFSCAN"
 }
 
 : 'Gather resolvers'
 gatherResolvers(){
-	notify "Starting Downloading fresh resolvers"
+	notify "Downloading fresh resolvers"
 	wget -q https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt -O "$IPS"/resolvers.txt
 }
 
 : 'subdomain gathering'
 gatherSubdomains(){
+	notify "Getting subdomains"
+
 	notify "Starting sublert"
 	notify "Checking for existing sublert output, otherwise add it."
 	if [ ! -e "$SUBS"/sublert.txt ]; then
@@ -69,12 +71,13 @@ gatherSubdomains(){
 	
 	notify "Getting alive hosts.."
 	cat "$SUBS"/alive_subdomains | httprobe -p http:81 -p http:3000 -p https:3000 -p http:3001 -p https:3001 -p http:8000 -p http:8080 -p https:8443 -c 50 | anew -q "$SUBS"/hosts
-	# cat "$SUBS"/alive_subdomains | dnsgen - | httprobe -p http:81 -p http:3000 -p https:3000 -p http:3001 -p https:3001 -p http:8000 -p http:8080 -p https:8443 -c 50 | anew -q "$SUBS"/hosts
 	notify "Done."
 }
 
 : 'subdomain takeover check'
 checkTakeovers(){
+	notify "Checking for subdomain takeover"
+
 	notify "Starting subjack"
 	"$HOME"/go/bin/subjack -w "$SUBS"/hosts -a -t 50 -v -c "$HOME"/go/src/github.com/haccer/subjack/fingerprints.json -o "$SUBS"/all-takeover-checks.txt -ssl 2>/dev/null 1>/dev/null
 	grep -v "Not Vulnerable" <"$SUBS"/all-takeover-checks.txt >"$SUBS"/takeovers
@@ -101,17 +104,19 @@ checkTakeovers(){
 	else
 		notify "No takeovers found."
 	fi
+	notify "Done."
 }
 
 : 'Get all CNAME'
 getCNAME(){
-	notify "Starting dnsprobe to get CNAMEs"
+	notify "Getting CNAMEs"
 	dnsprobe -silent -r CNAME -l "$SUBS"/subdomains -o "$SUBS"/subdomains_cname.txt
+	notify "Done."
 }
 
 : 'Gather IPs with dnsprobe'
 gatherIPs(){
-	notify "Starting dnsprobe"
+	notify "Gathering IPs"
 	dnsprobe -l "$SUBS"/subdomains -silent -f ip | sort -u | anew -q "$IPS"/"$domain"-ips.txt
 	python3 $BASE/nullbot/modules/recon/scripts/clean_ips.py "$IPS"/"$domain"-ips.txt "$IPS"/"$domain"-origin-ips.txt
 	notify "Done."
@@ -119,57 +124,59 @@ gatherIPs(){
 
 : 'Portscan on found IP addresses'
 portScan(){
-	startFunction  "Port Scan"
+	notify "Running Port Scan"
+	mkdir -p "$PORTSCAN"
 	nmap -sV -T4 --max-retries 10 -p- --script vulners,http-title --min-rate 100000 -iL "$SUBS"/alive_subdomains -oA "$PORTSCAN"/recon-hosts 2>/dev/null 1>/dev/null
 	nmap -sV -T4 --max-retries 10 -p- --script vulners,http-title --min-rate 100000 -iL "$IPS"/"$domain"-ips.txt -oA "$PORTSCAN"/recon-ips 2>/dev/null 1>/dev/null
-	notify "Port Scan finished"
+	notify "Done."
 }
 
 : 'Gather screenshots'
 gatherScreenshots(){
-	notify "Starting Screenshot Gathering"
+	notify "Taking screenshots"
 	cat "$SUBS"/hosts | aquatone -silent -http-timeout 10000 -ports xlarge -out "$SCREENSHOTS" 2>/dev/null 1>/dev/null
-	notify "Screenshot Gathering finished"
+	notify "Done."
 }
 
 fetchArchive(){
-	notify "Starting fetchArchive"
+	notify "Fetching Archives"
 	cat "$SUBS"/hosts | sed 's/https\?:\/\///' | waybackurls > "$ARCHIVE"/urls.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | unfurl --unique keys > "$ARCHIVE"/paramlist.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.js(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jsurls.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.php(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/phpurls.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.aspx(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/aspxurls.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.jsp(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jspurls.txt
-	notify "fetchArchive finished"
+	notify "Done."
 }
 
 fetchEndpoints(){
-	notify "Starting fetchEndpoints"
+	notify "Fetching endpoints"
 	for js in `cat "$ARCHIVE"/jsurls.txt`;
 	do
 		python3 "$HOME"/tools/LinkFinder/linkfinder.py -i $js -o cli | anew -q "$ARCHIVE"/endpoints.txt;
 	done
-	notify "fetchEndpoints finished"
+	notify "Done."
 }
 
 : 'Use gf to find secrets in responses'
 startGfScan(){
-	notify "Starting Checking for vulnerabilites using gf"
+	notify "Basic vuln check with gf"
 	cd "$ARCHIVE"
 	for i in `gf -list`; do gf ${i} urls.txt | anew -q "$GFSCAN"/"${i}".txt; done
 	cd ~
+	notify "Done."
 }
 
 : 'Check for Vulnerabilities'
 runNuclei(){
-	startFunction  "Nuclei Defaults Scan"
+	notify  "Nuclei Defaults Scan"
 	nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
 	nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
-	notify "Nuclei Scan finished"
+	notify "Done."
 }
 
 notifySlack(){
-	notify "Starting Trigger Slack Notification"
+	notify "Triggering Slack Notification"
 
 	echo -e "NullBot recon on $domain completed!" | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	totalsum=$(cat $SUBS/hosts | wc -l)
@@ -200,6 +207,8 @@ checkArguments
 checkDirectories
 gatherResolvers
 gatherSubdomains
+getCNAME
+gatherIPs
 checkTakeovers
 fetchArchive
 fetchEndpoints
@@ -207,8 +216,6 @@ fetchEndpoints
 startGfScan
 gatherScreenshots
 runNuclei
-# getCNAME
-# gatherIPs
-# portScan (add an if statement to control the running)
 # run directory fuzz for sensitive data exposure
+# portScan (add an if statement to control the running)
 notifySlack

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import subprocess,argparse
+import os,argparse
 
 nullbot_dir = "$HOME/tools/nullbot"
 version = "v0.3"
@@ -10,10 +10,10 @@ def Banner():
     print(head)
 
 def recon(domain):
-    subprocess.call('{}/modules/recon/recon.sh {}'.format(nullbot_dir, domain))
+    os.system('{}/modules/recon/recon.sh {}'.format(nullbot_dir, domain))
 
 def network(ip):
-    subprocess.call('{}/modules/network/network.sh {}'.format(nullbot_dir, ip))
+    os.system('{}/modules/network/network.sh {}'.format(nullbot_dir, ip))
 
 def main():
     # Define argument parser
@@ -22,7 +22,7 @@ def main():
     # Arguments that can be supplied
     domain_group.add_argument('-d', '--domain', help='Target domain', dest='domain', type=str, nargs='?')
     domain_group.add_argument('-t', '--target', help='Target IP address or hostname', dest='ip', type=str, nargs='?')
-    parser.add_argument('-m', '--module', help='Module to run', dest='module', type=str, nargs='?', choices=['all','network','recon','redirect'], required=True)
+    parser.add_argument('-m', '--module', help='Module to run', dest='module', type=str, nargs='?', choices=['recon','network'], required=True)
 
     # Parse arguments
     args = parser.parse_args()
