@@ -11,7 +11,7 @@ httpx
 subjack
 nuclei
 unfurl
-waybackurls
+gau
 gf
 slackcat
 shuffledns
@@ -19,7 +19,6 @@ shuffledns
 # python tools
 
 # other
-sublert
 linkfinder
 dirsearch
 interlace

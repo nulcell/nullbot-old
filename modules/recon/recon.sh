@@ -30,38 +30,32 @@ checkArguments(){
 checkDirectories(){
 	notify "Creating directories and grabbing wordlists for $GREEN$domain$RESET.."
 	mkdir -p "$RESULTDIR"
-	mkdir -p "$SUBS" "$SCREENSHOTS" "$IPS" "$ARCHIVE" "$NUCLEISCAN" "$GFSCAN"
 }
 
 : 'Gather resolvers'
 gatherResolvers(){
 	notify "Downloading fresh resolvers"
+	mkdir -p "$IPS"
 	wget -q https://raw.githubusercontent.com/janmasarik/resolvers/master/resolvers.txt -O "$IPS"/resolvers.txt
 }
 
 : 'subdomain gathering'
 gatherSubdomains(){
 	notify "Getting subdomains"
-
-	notify "Starting sublert"
-	notify "Checking for existing sublert output, otherwise add it."
-	if [ ! -e "$SUBS"/sublert.txt ]; then
-		cd "$HOME"/tools/sublert || return
-		python3 sublert.py -q False -u "$domain" 2>/dev/null 1>/dev/null
-		cp "$HOME"/tools/sublert/output/"$domain".txt "$SUBS"/sublert.txt
-		cd "$HOME" || return
-	else
-		cp "$HOME"/tools/sublert/output/"$domain".txt "$SUBS"/sublert.txt
-	fi
-	notify "Done, next."
+	mkdir -p "$SUBS"
 
 	notify "Starting assetfinder"
 	"$HOME"/go/bin/assetfinder --subs-only "$domain" >"$SUBS"/assetfinder.txt
 	notify "Done, next."
 
-	notify "Starting amass"
-	"$HOME"/go/bin/amass enum -silent -brute -active -d "$domain" -o "$SUBS"/amass.txt
+	notify "Starting subfinder"
+	"$HOME"/go/bin/subfinder -silent -d "$domain" -all -config "$BASE"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt 1>/dev/null 2>/dev/null
 	notify "Done, next."
+
+	# Pausing the use of amass due to memory issues on free tier VPS 
+	# notify "Starting amass"
+	# "$HOME"/go/bin/amass enum -silent -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt
+	# notify "Done, next."
 
 	notify "Combining and sorting results.."
 	cat "$SUBS"/*.txt | sort -u > "$SUBS"/subdomains
@@ -79,8 +73,8 @@ checkTakeovers(){
 	notify "Checking for subdomain takeover"
 
 	notify "Starting subjack"
-	"$HOME"/go/bin/subjack -w "$SUBS"/hosts -a -t 50 -v -c "$HOME"/go/src/github.com/haccer/subjack/fingerprints.json -o "$SUBS"/all-takeover-checks.txt -ssl 2>/dev/null 1>/dev/null
-	grep -v "Not Vulnerable" <"$SUBS"/all-takeover-checks.txt >"$SUBS"/takeovers
+	"$HOME"/go/bin/subjack -w "$SUBS"/subdomains -a -t 50 -v -c "$HOME"/go/src/github.com/haccer/subjack/fingerprints.json -o "$SUBS"/all-takeover-checks.txt -ssl 2>/dev/null 1>/dev/null
+	grep -v "Not Vulnerable" "$SUBS"/all-takeover-checks.txt > "$SUBS"/takeovers
 	rm "$SUBS"/all-takeover-checks.txt
 
 	vulnto=$(cat "$SUBS"/takeovers)
@@ -94,11 +88,11 @@ checkTakeovers(){
 	fi
 
 	notify "Starting nuclei subdomain takeover check"
-	nuclei -silent -l "$SUBS"/hosts -t "$HOME"/nuclei-templates/takeovers -c 50 -o "$SUBS"/nuclei-takeover-checks.txt 2>/dev/null 1>/dev/null
-	vulnto=$(cat "$SUBS"/nuclei-takeover-checks.txt)
+	nuclei -silent -l "$SUBS"/subdomains -t "$HOME"/nuclei-templates/takeovers -c 50 -o "$SUBS"/nuclei-takeover.txt 2>/dev/null 1>/dev/null
+	vulnto=$(cat "$SUBS"/nuclei-takeover.txt)
 	if [[ $vulnto != "" ]]; then
 		notify "Possible subdomain takeovers:"
-		for line in "$SUBS"/nuclei-takeover-checks.txt; do
+		for line in "$SUBS"/nuclei-takeover.txt; do
 			notify "--> $vulnto "
 		done
 	else
@@ -117,6 +111,7 @@ getCNAME(){
 : 'Gather IPs with dnsprobe'
 gatherIPs(){
 	notify "Gathering IPs"
+	mkdir -p "$IPS"
 	dnsprobe -l "$SUBS"/subdomains -silent -f ip | sort -u | anew -q "$IPS"/"$domain"-ips.txt
 	python3 $BASE/nullbot/modules/recon/scripts/clean_ips.py "$IPS"/"$domain"-ips.txt "$IPS"/"$domain"-origin-ips.txt
 	notify "Done."
@@ -134,14 +129,19 @@ portScan(){
 : 'Gather screenshots'
 gatherScreenshots(){
 	notify "Taking screenshots"
+	mkdir -p "$SCREENSHOTS"
 	cat "$SUBS"/hosts | aquatone -silent -http-timeout 10000 -ports xlarge -out "$SCREENSHOTS" 2>/dev/null 1>/dev/null
 	notify "Done."
 }
 
 fetchArchive(){
 	notify "Fetching Archives"
-	cat "$SUBS"/hosts | sed 's/https\?:\/\///' | waybackurls > "$ARCHIVE"/urls.txt
+	mkdir -p "$ARCHIVE"
+	cat "$SUBS"/alive_subdomains | "$HOME"/go/bin/gau | sort | uniq -u > "$ARCHIVE"/urls.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | unfurl --unique keys > "$ARCHIVE"/paramlist.txt
+	notify "Pulling extensions from archive"
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.txt(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/text.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.bak(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/bak.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.js(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jsurls.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.php(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/phpurls.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.aspx(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/aspxurls.txt
@@ -151,9 +151,12 @@ fetchArchive(){
 
 fetchEndpoints(){
 	notify "Fetching endpoints"
+	mkdir -p "$ARCHIVE"/endpoints/
+	
 	for js in `cat "$ARCHIVE"/jsurls.txt`;
 	do
-		python3 "$HOME"/tools/LinkFinder/linkfinder.py -i $js -o cli | anew -q "$ARCHIVE"/endpoints.txt;
+		file=`echo "$js" | cut -d "/" -f 3`
+		python3 "$HOME"/tools/LinkFinder/linkfinder.py -i $js -o cli | anew -q "$ARCHIVE"/endpoints/"$file".txt;
 	done
 	notify "Done."
 }
@@ -161,6 +164,7 @@ fetchEndpoints(){
 : 'Use gf to find secrets in responses'
 startGfScan(){
 	notify "Basic vuln check with gf"
+	mkdir -p "$GFSCAN"
 	cd "$ARCHIVE"
 	for i in `gf -list`; do gf ${i} urls.txt | anew -q "$GFSCAN"/"${i}".txt; done
 	cd ~
@@ -170,8 +174,15 @@ startGfScan(){
 : 'Check for Vulnerabilities'
 runNuclei(){
 	notify  "Nuclei Defaults Scan"
+	mkdir -p "$NUCLEISCAN"
 	nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
 	nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	notify "Done."
+}
+
+runSearch(){
+	notify "Checking for directories and hidden files"
+	# use dirsearch and interlace to scan using a good wordlist
 	notify "Done."
 }
 
@@ -212,10 +223,10 @@ gatherIPs
 checkTakeovers
 fetchArchive
 fetchEndpoints
-# Create endpoint input scanner to fuzz for paramters (for POST and GET)
+# Create endpoint input scanner to fuzz for paramters (for POST and GET) - Scan potential endpoints using Arjun
 startGfScan
 gatherScreenshots
 runNuclei
-# run directory fuzz for sensitive data exposure
+# runSearch
 # portScan (add an if statement to control the running)
 notifySlack
