@@ -6,6 +6,8 @@ GREEN="\033[0;32m"
 RESET="\033[0m"
 domain="$1"
 BASE="$HOME/tools"
+GOBIN="$HOME/go/bin"
+
 RESULTDIR="$BASE/nullbot/output/$domain"
 SCREENSHOTS="$RESULTDIR/screenshots"
 SUBS="$RESULTDIR/subdomains"
@@ -14,6 +16,8 @@ IPS="$RESULTDIR/ips"
 PORTSCAN="$RESULTDIR/portscan"
 ARCHIVE="$RESULTDIR/archive"
 NUCLEISCAN="$RESULTDIR/nucleiscan"
+DIRSEARCH="$RESULTDIR/dirsearch"
+SPIDER="$RESULTDIR/spider"
 
 notify(){
 	echo -e "$GREEN[+]$RESET $1"
@@ -45,26 +49,30 @@ gatherSubdomains(){
 	mkdir -p "$SUBS"
 
 	notify "Starting assetfinder"
-	"$HOME"/go/bin/assetfinder --subs-only "$domain" >"$SUBS"/assetfinder.txt
+	"$GOBIN"/assetfinder --subs-only "$domain" >"$SUBS"/assetfinder.txt
 	notify "Done, next."
 
 	notify "Starting subfinder"
-	"$HOME"/go/bin/subfinder -silent -d "$domain" -all -config "$BASE"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt 1>/dev/null 2>/dev/null
+	"$GOBIN"/subfinder -silent -d "$domain" -all -config "$BASE"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt 1>/dev/null 2>/dev/null
 	notify "Done, next."
 
-	# Pausing the use of amass due to memory issues on free tier VPS 
-	# notify "Starting amass"
-	# "$HOME"/go/bin/amass enum -silent -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt
-	# notify "Done, next."
+	# Pausing the use of amass due to memory issues on AWS Free Tier EC2 Instance without swap
+	notify "Starting amass"
+	"$GOBIN"/amass enum -silent -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt | "$GOBIN"/anew -q "$SUBS"/amass-anew.txt &
+	pid=$!
+	echo "waiting 5 minutes for amass"
+	sleep 1200
+	kill $pid
+	notify "Done, next."
 
 	notify "Combining and sorting results.."
-	cat "$SUBS"/*.txt | sort -u > "$SUBS"/subdomains
+	cat "$SUBS"/*.txt | sort -u | "$GOBIN"/anew -q "$SUBS"/subdomains
 
 	notify "Resolving subdomains.."
-	cat "$SUBS"/subdomains | sort -u | shuffledns -silent -d "$domain" -r "$IPS"/resolvers.txt > "$SUBS"/alive_subdomains
+	cat "$SUBS"/subdomains | sort -u | "$GOBIN"/shuffledns -silent -d "$domain" -r "$IPS"/resolvers.txt > "$SUBS"/alive_subdomains
 	
 	notify "Getting alive hosts.."
-	cat "$SUBS"/alive_subdomains | httprobe -p http:81 -p http:3000 -p https:3000 -p http:3001 -p https:3001 -p http:8000 -p http:8080 -p https:8443 -c 50 | anew -q "$SUBS"/hosts
+	cat "$SUBS"/alive_subdomains | "$GOBIN"/httprobe -p http:81 -p http:3000 -p https:3000 -p http:3001 -p https:3001 -p http:8000 -p http:8080 -p https:8443 -c 50 | "$GOBIN"/anew -q "$SUBS"/hosts
 	notify "Done."
 }
 
@@ -73,7 +81,7 @@ checkTakeovers(){
 	notify "Checking for subdomain takeover"
 
 	notify "Starting subjack"
-	"$HOME"/go/bin/subjack -w "$SUBS"/subdomains -a -t 50 -v -c "$HOME"/go/src/github.com/haccer/subjack/fingerprints.json -o "$SUBS"/all-takeover-checks.txt -ssl 2>/dev/null 1>/dev/null
+	"$GOBIN"/subjack -w "$SUBS"/subdomains -a -t 50 -v -c "$HOME"/go/src/github.com/haccer/subjack/fingerprints.json -o "$SUBS"/all-takeover-checks.txt -ssl 2>/dev/null 1>/dev/null
 	grep -v "Not Vulnerable" "$SUBS"/all-takeover-checks.txt > "$SUBS"/takeovers
 	rm "$SUBS"/all-takeover-checks.txt
 
@@ -88,7 +96,7 @@ checkTakeovers(){
 	fi
 
 	notify "Starting nuclei subdomain takeover check"
-	nuclei -silent -l "$SUBS"/subdomains -t "$HOME"/nuclei-templates/takeovers -c 50 -o "$SUBS"/nuclei-takeover.txt 2>/dev/null 1>/dev/null
+	"$GOBIN"/nuclei -silent -l "$SUBS"/subdomains -t "$HOME"/nuclei-templates/takeovers -c 50 -o "$SUBS"/nuclei-takeover.txt 2>/dev/null 1>/dev/null
 	vulnto=$(cat "$SUBS"/nuclei-takeover.txt)
 	if [[ $vulnto != "" ]]; then
 		notify "Possible subdomain takeovers:"
@@ -104,7 +112,7 @@ checkTakeovers(){
 : 'Get all CNAME'
 getCNAME(){
 	notify "Getting CNAMEs"
-	dnsprobe -silent -r CNAME -l "$SUBS"/subdomains -o "$SUBS"/subdomains_cname.txt
+	"$GOBIN"/dnsprobe -silent -r CNAME -l "$SUBS"/subdomains -o "$SUBS"/subdomains_cname.txt
 	notify "Done."
 }
 
@@ -112,8 +120,7 @@ getCNAME(){
 gatherIPs(){
 	notify "Gathering IPs"
 	mkdir -p "$IPS"
-	dnsprobe -l "$SUBS"/subdomains -silent -f ip | sort -u | anew -q "$IPS"/"$domain"-ips.txt
-	python3 $BASE/nullbot/modules/recon/scripts/clean_ips.py "$IPS"/"$domain"-ips.txt "$IPS"/"$domain"-origin-ips.txt
+	"$GOBIN"/dnsprobe -l "$SUBS"/subdomains -silent -f ip | sort -u | "$GOBIN"/anew -q "$IPS"/"$domain"-ips.txt
 	notify "Done."
 }
 
@@ -137,15 +144,22 @@ gatherScreenshots(){
 fetchArchive(){
 	notify "Fetching Archives"
 	mkdir -p "$ARCHIVE"
-	cat "$SUBS"/alive_subdomains | "$HOME"/go/bin/gau | sort | uniq -u > "$ARCHIVE"/urls.txt
-	cat "$ARCHIVE"/urls.txt  | sort -u | unfurl --unique keys > "$ARCHIVE"/paramlist.txt
+	cat "$SUBS"/alive_subdomains | "$GOBIN"/gau | sort | uniq -u > "$ARCHIVE"/urls.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | "$GOBIN"/unfurl --unique keys > "$ARCHIVE"/paramlist.txt
 	notify "Pulling extensions from archive"
-	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.txt(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/text.txt
-	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.bak(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/bak.txt
-	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.js(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jsurls.txt
-	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.php(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/phpurls.txt
-	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.aspx(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/aspxurls.txt
-	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.jsp(\?|$)" | httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jspurls.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.txt(\?|$)" | "$GOBIN"/httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/text.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.bak(\?|$)" | "$GOBIN"/httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/bak.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.js(\?|$)" | "$GOBIN"/httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jsurls.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.php(\?|$)" | "$GOBIN"/httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/phpurls.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.aspx(\?|$)" | "$GOBIN"/httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/aspxurls.txt
+	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.jsp(\?|$)" | "$GOBIN"/httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jspurls.txt
+	notify "Done."
+}
+
+runSpider(){
+	notify "Crawling sites"
+	mkdir -p $SPIDER
+	"$GOBIN"/gospider -S "$SUBS"/hosts -u $hackerhandle -a -r -t 5 -c 10 -d 3 -o $SPIDER | "$GOBIN"/anew -q $SPIDER/all.txt
 	notify "Done."
 }
 
@@ -156,7 +170,7 @@ fetchEndpoints(){
 	for js in `cat "$ARCHIVE"/jsurls.txt`;
 	do
 		file=`echo "$js" | cut -d "/" -f 3`
-		python3 "$HOME"/tools/LinkFinder/linkfinder.py -i $js -o cli | anew -q "$ARCHIVE"/endpoints/"$file".txt;
+		python3 "$HOME"/tools/LinkFinder/linkfinder.py -i $js -o cli | "$GOBIN"/anew -q "$ARCHIVE"/endpoints/"$file".txt;
 	done
 	notify "Done."
 }
@@ -166,7 +180,7 @@ startGfScan(){
 	notify "Basic vuln check with gf"
 	mkdir -p "$GFSCAN"
 	cd "$ARCHIVE"
-	for i in `gf -list`; do gf ${i} urls.txt | anew -q "$GFSCAN"/"${i}".txt; done
+	for i in `gf -list`; do "$GOBIN"/gf ${i} urls.txt | "$GOBIN"/anew -q "$GFSCAN"/"${i}".txt; done
 	cd ~
 	notify "Done."
 }
@@ -175,36 +189,49 @@ startGfScan(){
 runNuclei(){
 	notify  "Nuclei Defaults Scan"
 	mkdir -p "$NUCLEISCAN"
-	nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
-	nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	"$GOBIN"/nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
+	"$GOBIN"/nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
 	notify "Done."
 }
 
 runSearch(){
 	notify "Checking for directories and hidden files"
-	# use dirsearch and interlace to scan using a good wordlist
+	mkdir -p $DIRSEARCH
+	sleep 5
+	# interlace -tL "$SUBS"/alive_subdomains -threads 5 --silent -c "python3 ~/tools/dirsearch/dirsearch.py -u _target_ -w "$BASE"/nullbot/modules/recon/wordlists/common-files.txt -F --full-url --no-color --quiet --scheme=https > "$DIRSEARCH"/https-_target_"
+	## interlace -tL "$SUBS"/alive_subdomains -threads 5 --silent -c "python ~/tools/dirsearch/dirsearch.py -u _target_ -w "$BASE"/nullbot/modules/recon/wordlists/common-files.txt -F --full-url --no-color --quiet --scheme=http > "$DIRSEARCH"/http-_target_"
+
+	# slower alternative
+	python3 ~/tools/dirsearch/dirsearch.py -u "$domain" -w "$BASE"/nullbot/modules/recon/wordlists/common-files.txt -F --full-url --no-color --quiet --scheme=https | "$GOBIN"/anew -q "$DIRSEARCH"/basic.txt
+	
+	notify "Combining results.."
+	cat "$DIRSEARCH"/*.txt | cut -d "-" -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
+
+	notify "Running nuclei on discovered points"
+	"$GOBIN"/nuclei -l "$DIRSEARCH"/result.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/dir-info.txt -severity info -silent 2>/dev/null 1>/dev/null
+	"$GOBIN"/nuclei -l "$DIRSEARCH"/result.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/dir-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
 	notify "Done."
 }
 
 notifySlack(){
 	notify "Triggering Slack Notification"
 
-	echo -e "NullBot recon on $domain completed!" | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
+	echo -e "NullBot recon on $domain completed!" | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	totalsum=$(cat $SUBS/hosts | wc -l)
-	echo -e "$totalsum live subdomain hosts discovered" | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
+	echo -e "$totalsum live subdomain hosts discovered" | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 
 	possibletko="$(cat $SUBS/takeovers | wc -l)"
 	if [ -s "$SUBS/takeovers" ]; then
-        	echo -e "Found $possibletko possible subdomain takeovers." | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
+        	echo -e "Found $possibletko possible subdomain takeovers." | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	else
-        	echo "No subdomain takeovers found." | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
+        	echo "No subdomain takeovers found." | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	fi
 
 	if [ -f "$NUCLEISCAN/default-vulns.txt" ]; then
-		echo "exploits discovered:" | slackcat 2>/dev/null 1>/dev/null
-		cat "$NUCLEISCAN/default-vulns.txt" | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
+		echo "exploits discovered:" | "$GOBIN"/slackcat 2>/dev/null 1>/dev/null
+		cat "$NUCLEISCAN/default-vulns.txt" | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	else
-		echo -e "No exploits discovered." | slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
+		echo -e "No exploits discovered." | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	fi
 
 	notify "Done."
@@ -223,10 +250,10 @@ gatherIPs
 checkTakeovers
 fetchArchive
 fetchEndpoints
-# Create endpoint input scanner to fuzz for paramters (for POST and GET) - Scan potential endpoints using Arjun
 startGfScan
 gatherScreenshots
 runNuclei
-# runSearch
+runSpider
+runSearch
 # portScan (add an if statement to control the running)
 notifySlack
