@@ -16,8 +16,9 @@ IPS="$RESULTDIR/ips"
 PORTSCAN="$RESULTDIR/portscan"
 ARCHIVE="$RESULTDIR/archive"
 NUCLEISCAN="$RESULTDIR/nucleiscan"
-DIRSEARCH="$RESULTDIR/dirsearch"
+DIRSEARCH="$RESULTDIR/discovery"
 SPIDER="$RESULTDIR/spider"
+TECH="$RESULTDIR/tech"
 
 notify(){
 	echo -e "$GREEN[+]$RESET $1"
@@ -60,8 +61,8 @@ gatherSubdomains(){
 	notify "Starting amass"
 	"$GOBIN"/amass enum -silent -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt | "$GOBIN"/anew -q "$SUBS"/amass-anew.txt &
 	pid=$!
-	echo "waiting 5 minutes for amass"
-	sleep 1200
+	echo "waiting 10 minutes for amass"
+	sleep 600
 	kill $pid
 	notify "Done, next."
 
@@ -69,10 +70,18 @@ gatherSubdomains(){
 	cat "$SUBS"/*.txt | sort -u | "$GOBIN"/anew -q "$SUBS"/subdomains
 
 	notify "Resolving subdomains.."
-	cat "$SUBS"/subdomains | sort -u | "$GOBIN"/shuffledns -silent -d "$domain" -r "$IPS"/resolvers.txt > "$SUBS"/alive_subdomains
+	cat "$SUBS"/subdomains | sort -u | "$GOBIN"/shuffledns -silent -d "$domain" -r "$IPS"/resolvers.txt > "$SUBS"/alive_subdomains.txt
 	
 	notify "Getting alive hosts.."
-	cat "$SUBS"/alive_subdomains | "$GOBIN"/httprobe -p http:81 -p http:3000 -p https:3000 -p http:3001 -p https:3001 -p http:8000 -p http:8080 -p https:8443 -c 50 | "$GOBIN"/anew -q "$SUBS"/hosts
+	cat "$SUBS"/alive_subdomains.txt | "$GOBIN"/httprobe -p http:81 -p http:3000 -p https:3000 -p http:3001 -p https:3001 -p http:8000 -p http:8080 -p https:8443 -c 50 | "$GOBIN"/anew -q "$SUBS"/hosts.txt
+	notify "Done."
+}
+
+techDiscovery(){
+	notify "Checking web technologies"
+	mkdir -p $TECH
+	whatweb -i "$SUBS"/hosts.txt -H "x-bug-bounty: $hackerhandle" -a 3 --log-brief="$TECH"/log.txt --log-verbose="$TECH"/log-verbose.txt --log-xml=log.xml --no-errors -q 2>/dev/null
+	cat "$TECH"/log.txt | grep "200 OK" > "$TECH"/technologies.txt
 	notify "Done."
 }
 
@@ -124,27 +133,10 @@ gatherIPs(){
 	notify "Done."
 }
 
-: 'Portscan on found IP addresses'
-portScan(){
-	notify "Running Port Scan"
-	mkdir -p "$PORTSCAN"
-	nmap -sV -T4 --max-retries 10 -p- --script vulners,http-title --min-rate 100000 -iL "$SUBS"/alive_subdomains -oA "$PORTSCAN"/recon-hosts 2>/dev/null 1>/dev/null
-	nmap -sV -T4 --max-retries 10 -p- --script vulners,http-title --min-rate 100000 -iL "$IPS"/"$domain"-ips.txt -oA "$PORTSCAN"/recon-ips 2>/dev/null 1>/dev/null
-	notify "Done."
-}
-
-: 'Gather screenshots'
-gatherScreenshots(){
-	notify "Taking screenshots"
-	mkdir -p "$SCREENSHOTS"
-	cat "$SUBS"/hosts | aquatone -silent -http-timeout 10000 -ports xlarge -out "$SCREENSHOTS" 2>/dev/null 1>/dev/null
-	notify "Done."
-}
-
 fetchArchive(){
 	notify "Fetching Archives"
 	mkdir -p "$ARCHIVE"
-	cat "$SUBS"/alive_subdomains | "$GOBIN"/gau | sort | uniq -u > "$ARCHIVE"/urls.txt
+	cat "$SUBS"/alive_subdomains.txt | "$GOBIN"/gau | sort | uniq -u > "$ARCHIVE"/urls.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | "$GOBIN"/unfurl --unique keys > "$ARCHIVE"/paramlist.txt
 	notify "Pulling extensions from archive"
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.txt(\?|$)" | "$GOBIN"/httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/text.txt
@@ -153,13 +145,6 @@ fetchArchive(){
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.php(\?|$)" | "$GOBIN"/httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/phpurls.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.aspx(\?|$)" | "$GOBIN"/httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/aspxurls.txt
 	cat "$ARCHIVE"/urls.txt  | sort -u | grep -P "\w+\.jsp(\?|$)" | "$GOBIN"/httpx -silent -status-code -mc 200 | awk '{print $1}' | sort -u > "$ARCHIVE"/jspurls.txt
-	notify "Done."
-}
-
-runSpider(){
-	notify "Crawling sites"
-	mkdir -p $SPIDER
-	"$GOBIN"/gospider -S "$SUBS"/hosts -u $hackerhandle -a -r -t 5 -c 10 -d 3 -o $SPIDER | "$GOBIN"/anew -q $SPIDER/all.txt
 	notify "Done."
 }
 
@@ -185,12 +170,27 @@ startGfScan(){
 	notify "Done."
 }
 
+: 'Gather screenshots'
+gatherScreenshots(){
+	notify "Taking screenshots"
+	mkdir -p "$SCREENSHOTS"
+	cat "$SUBS"/hosts.txt | aquatone -silent -http-timeout 10000 -ports xlarge -out "$SCREENSHOTS" 2>/dev/null 1>/dev/null
+	notify "Done."
+}
+
 : 'Check for Vulnerabilities'
 runNuclei(){
 	notify  "Nuclei Defaults Scan"
 	mkdir -p "$NUCLEISCAN"
-	"$GOBIN"/nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
-	"$GOBIN"/nuclei -l "$SUBS"/hosts -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	"$GOBIN"/nuclei -l "$SUBS"/hosts.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
+	"$GOBIN"/nuclei -l "$SUBS"/hosts.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	notify "Done."
+}
+
+runSpider(){
+	notify "Crawling sites"
+	mkdir -p $SPIDER
+	"$GOBIN"/gospider -S "$SUBS"/hosts.txt -u $hackerhandle -a -r -t 5 -c 10 -d 3 -o $SPIDER  | sort -u > $SPIDER/all.txt
 	notify "Done."
 }
 
@@ -198,18 +198,29 @@ runSearch(){
 	notify "Checking for directories and hidden files"
 	mkdir -p $DIRSEARCH
 	sleep 5
-	# interlace -tL "$SUBS"/alive_subdomains -threads 5 --silent -c "python3 ~/tools/dirsearch/dirsearch.py -u _target_ -w "$BASE"/nullbot/modules/recon/wordlists/common-files.txt -F --full-url --no-color --quiet --scheme=https > "$DIRSEARCH"/https-_target_"
-	## interlace -tL "$SUBS"/alive_subdomains -threads 5 --silent -c "python ~/tools/dirsearch/dirsearch.py -u _target_ -w "$BASE"/nullbot/modules/recon/wordlists/common-files.txt -F --full-url --no-color --quiet --scheme=http > "$DIRSEARCH"/http-_target_"
+	
+	# Using interlace and ffuf
+	interlace -tL "$SUBS"/hosts.txt -threads 5 --silent -c ""$GOBIN"/ffuf -u _target_/FUZZ -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -fc 404,400,500 -or -o ffuftest.txt -v 2>/dev/null | grep URL | cut -d '|' -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/interlace.txt"
 
 	# slower alternative
-	python3 ~/tools/dirsearch/dirsearch.py -u "$domain" -w "$BASE"/nullbot/modules/recon/wordlists/common-files.txt -F --full-url --no-color --quiet --scheme=https | "$GOBIN"/anew -q "$DIRSEARCH"/basic.txt
-	
+	#python3 ~/tools/dirsearch/dirsearch.py -u "$domain" -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -F --full-url --no-color --quiet --scheme=https | "$GOBIN"/anew -q "$DIRSEARCH"/basic.txt
+	"$GOBIN"/ffuf -u https://"$domain"/FUZZ -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -fc 404,400,500 -or -o ffuftest.txt -v 2>/dev/null | grep URL | cut -d '|' -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/ffuf.txt
+
 	notify "Combining results.."
 	cat "$DIRSEARCH"/*.txt | cut -d "-" -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
 
 	notify "Running nuclei on discovered points"
-	"$GOBIN"/nuclei -l "$DIRSEARCH"/result.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/dir-info.txt -severity info -silent 2>/dev/null 1>/dev/null
-	"$GOBIN"/nuclei -l "$DIRSEARCH"/result.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/dir-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	#"$GOBIN"/nuclei -l "$DIRSEARCH"/result.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/dir-info.txt -severity info -silent 2>/dev/null 1>/dev/null
+	"$GOBIN"/nuclei -l "$DIRSEARCH"/result.txt -c 500 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/dir-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	notify "Done."
+}
+
+: 'Portscan on found IP addresses'
+portScan(){
+	notify "Running Port Scan"
+	mkdir -p "$PORTSCAN"
+	nmap -sV -T4 --max-retries 10 -p- --script vulners,http-title --min-rate 100000 -iL "$SUBS"/alive_subdomains.txt -oA "$PORTSCAN"/recon-hosts.txt 2>/dev/null 1>/dev/null
+	nmap -sV -T4 --max-retries 10 -p- --script vulners,http-title --min-rate 100000 -iL "$IPS"/"$domain"-ips.txt -oA "$PORTSCAN"/recon-ips 2>/dev/null 1>/dev/null
 	notify "Done."
 }
 
@@ -217,8 +228,8 @@ notifySlack(){
 	notify "Triggering Slack Notification"
 
 	echo -e "NullBot recon on $domain completed!" | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
-	totalsum=$(cat $SUBS/hosts | wc -l)
-	echo -e "$totalsum live subdomain hosts discovered" | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
+	totalsum=$(cat $SUBS/hosts.txt | wc -l)
+	echo -e "$totalsum live subdomain hosts.txt discovered" | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 
 	possibletko="$(cat $SUBS/takeovers | wc -l)"
 	if [ -s "$SUBS/takeovers" ]; then
@@ -237,7 +248,24 @@ notifySlack(){
 	notify "Done."
 }
 
+: "Handle Ctrl-c"
+function trap_ctrlc ()
+{
+    # perform cleanup here
+    echo "Ctrl-C caught...performing clean up"
+
+    echo "Doing cleanup"
+
+    # exit shell script with error code 2
+    # if omitted, shell script will continue execution
+    exit 2
+}
+
 : 'Execute the main functions'
+
+# initialise trap to call trap_ctrlc function
+# when signal 2 (SIGINT) is received
+trap "trap_ctrlc" 2
 
 source ${BASE}/nullbot/modules/recon/configs/tokens
 
@@ -245,6 +273,7 @@ checkArguments
 checkDirectories
 gatherResolvers
 gatherSubdomains
+techDiscovery
 getCNAME
 gatherIPs
 checkTakeovers
@@ -255,5 +284,5 @@ gatherScreenshots
 runNuclei
 runSpider
 runSearch
-# portScan (add an if statement to control the running)
+# portScan # (add an if statement to control the running)
 notifySlack
