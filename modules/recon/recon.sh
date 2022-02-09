@@ -57,14 +57,18 @@ gatherSubdomains(){
 	"$GOBIN"/subfinder -silent -d "$domain" -all -config "$BASE"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt 1>/dev/null 2>/dev/null
 	notify "Done, next."
 
-	# Pausing the use of amass due to memory issues on AWS Free Tier EC2 Instance without swap
 	notify "Starting amass"
-	"$GOBIN"/amass enum -silent -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt | "$GOBIN"/anew -q "$SUBS"/amass-anew.txt &
-	pid=$!
-	echo "waiting 10 minutes for amass"
-	sleep 600
-	kill $pid
+	#"$GOBIN"/amass enum -silent -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt | "$GOBIN"/anew -q "$SUBS"/amass-anew.txt &
+	#pid=$!
+	#echo "waiting 20 minutes for amass"
+	#sleep 1200
+	#kill $pid
+
+	# testing
+	"$GOBIN"/amass enum -silent -active -brute -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt
 	notify "Done, next."
+
+	# Add altdns to expand scope of subdomain search
 
 	notify "Combining and sorting results.."
 	cat "$SUBS"/*.txt | sort -u | "$GOBIN"/anew -q "$SUBS"/subdomains
@@ -182,15 +186,17 @@ gatherScreenshots(){
 runNuclei(){
 	notify  "Nuclei Defaults Scan"
 	mkdir -p "$NUCLEISCAN"
-	"$GOBIN"/nuclei -l "$SUBS"/hosts.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-info.txt -severity info -silent 2>/dev/null 1>/dev/null
-	"$GOBIN"/nuclei -l "$SUBS"/hosts.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/default-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	"$GOBIN"/nuclei -l "$SUBS"/hosts.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/info.txt -severity info -silent > /dev/null
+	sleep 10
+	"$GOBIN"/nuclei -l "$SUBS"/hosts.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/vulns.txt -severity low,medium,high,critical -silent > /dev/null
 	notify "Done."
 }
 
 runSpider(){
 	notify "Crawling sites"
 	mkdir -p $SPIDER
-	"$GOBIN"/gospider -S "$SUBS"/hosts.txt -u $hackerhandle -a -r -t 5 -c 10 -d 3 -o $SPIDER  | sort -u > $SPIDER/all.txt
+	# "$GOBIN"/gospider -S "$SUBS"/hosts.txt -u $hackerhandle -a -r -t 5 -c 10 -o $SPIDER > /dev/null
+	"$GOBIN"/gospider -s https://"$domain" -u $hackerhandle -a -r -t 5 -c 10 -o $SPIDER > /dev/null
 	notify "Done."
 }
 
@@ -200,18 +206,19 @@ runSearch(){
 	sleep 5
 	
 	# Using interlace and ffuf
-	interlace -tL "$SUBS"/hosts.txt -threads 5 --silent -c ""$GOBIN"/ffuf -u _target_/FUZZ -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -fc 404,400,500 -or -o ffuftest.txt -v 2>/dev/null | grep URL | cut -d '|' -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/interlace.txt"
+	# interlace -tL "$SUBS"/hosts.txt -threads 5 --silent -c ""$GOBIN"/ffuf -u _target_/FUZZ -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -fc 404,400,500 -or -o ffuftest.txt -v 2>/dev/null | grep URL | cut -d '|' -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/interlace.txt"
 
 	# slower alternative
 	#python3 ~/tools/dirsearch/dirsearch.py -u "$domain" -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -F --full-url --no-color --quiet --scheme=https | "$GOBIN"/anew -q "$DIRSEARCH"/basic.txt
-	"$GOBIN"/ffuf -u https://"$domain"/FUZZ -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -fc 404,400,500 -or -o ffuftest.txt -v 2>/dev/null | grep URL | cut -d '|' -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/ffuf.txt
+	#"$GOBIN"/ffuf -u https://"$domain"/FUZZ -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -fc 404,400,500 -or -o ffuftest.txt -v 2>/dev/null | grep URL | cut -d '|' -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
+	"$GOBIN"/ffuf -u https://"$domain"/FUZZ -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -fc 404,400,500 -v 2>/dev/null | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
 
-	notify "Combining results.."
-	cat "$DIRSEARCH"/*.txt | cut -d "-" -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
+	#notify "Combining results.."
+	#cat "$DIRSEARCH"/*.txt | cut -d "-" -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
 
-	notify "Running nuclei on discovered points"
+	#notify "Running nuclei on discovered points"
 	#"$GOBIN"/nuclei -l "$DIRSEARCH"/result.txt -c 100 -rl 100 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/dir-info.txt -severity info -silent 2>/dev/null 1>/dev/null
-	"$GOBIN"/nuclei -l "$DIRSEARCH"/result.txt -c 500 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/dir-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
+	#"$GOBIN"/nuclei -l "$DIRSEARCH"/result.txt -c 500 -rl 500 -H "x-bug-bounty: $hackerhandle" -o "$NUCLEISCAN"/dir-vulns.txt -severity low,medium,high,critical -silent 2>/dev/null 1>/dev/null
 	notify "Done."
 }
 
@@ -281,8 +288,8 @@ fetchArchive
 fetchEndpoints
 startGfScan
 gatherScreenshots
+runSearch
 runNuclei
 runSpider
-runSearch
 # portScan # (add an if statement to control the running)
 notifySlack
