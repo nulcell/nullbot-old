@@ -245,9 +245,9 @@ notifySlack(){
         	echo "No subdomain takeovers found." | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	fi
 
-	if [ -f "$NUCLEISCAN/default-vulns.txt" ]; then
+	if [ -f "$NUCLEISCAN/vulns.txt" ]; then
 		echo "exploits discovered:" | "$GOBIN"/slackcat 2>/dev/null 1>/dev/null
-		cat "$NUCLEISCAN/default-vulns.txt" | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
+		cat "$NUCLEISCAN/vulns.txt" | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	else
 		echo -e "No exploits discovered." | "$GOBIN"/slackcat -u $SLACK_WEBHOOK_URL 2>/dev/null 1>/dev/null
 	fi
