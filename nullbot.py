@@ -15,12 +15,6 @@ def recon(domain):
 def network(ip):
     os.system('{}/modules/network/network.sh {}'.format(nullbot_dir, ip))
 
-def urlbased(domain):
-    os.system('{}/modules/recon/urlbased.sh {}'.format(nullbot_dir, domain))
-
-def domainsearch(domain):
-    os.system('{}/modules/recon/domainsearch.sh {}'.format(nullbot_dir, domain))
-
 def main():
     # Define argument parser
     parser = argparse.ArgumentParser(description='\033[0;34mNullBot\033[0m - \033[0;33m{}\033[0m'.format(version))    
@@ -28,7 +22,7 @@ def main():
     # Arguments that can be supplied
     domain_group.add_argument('-d', '--domain', help='Target domain', dest='domain', type=str, nargs='?')
     domain_group.add_argument('-t', '--target', help='Target IP address or hostname', dest='ip', type=str, nargs='?')
-    parser.add_argument('-m', '--module', help='Module to run', dest='module', type=str, nargs='?', choices=['recon','network', 'urlbased', 'domainsearch'], required=True)
+    parser.add_argument('-m', '--module', help='Module to run', dest='module', type=str, nargs='?', choices=['recon','network'], required=True)
 
     # Parse arguments
     args = parser.parse_args()
@@ -49,18 +43,6 @@ def main():
         else:
             print("Running Network scan on {}".format(args.ip))
             network(args.ip)
-    elif args.module == 'urlbased':
-        if  args.domain == None:
-            print("Error, please enter target domain using -d/--domain flag")
-        else:
-            print("Running urlbased scan on {}".format(args.domain))
-            urlbased(args.domain)
-    elif args.module == 'domainsearch':
-        if  args.domain == None:
-            print("Error, please enter target domain using -d/--domain flag")
-        else:
-            print("Running domainsearch scan on {}".format(args.domain))
-            domainsearch(args.domain)
     else:
         print("\033[0;31m[x]\033[0m Invalid Arguments, check -h/--help")
 
