@@ -1,10 +1,8 @@
 BASE="$HOME/tools"
-. "${BASE}/nullbot/modules/recon/reconFunctions.sh"
+. "${BASE}/nullbot/modules/recon/functions.sh"
 
 checkArguments
 checkDirectories
-gatherResolvers
-gatherSubdomains
 techDiscovery
 getCNAME
 gatherIPs
@@ -12,9 +10,7 @@ checkTakeovers
 fetchArchive
 fetchEndpoints
 startGfScan
-# gatherScreenshots
 runNuclei
 runSpider
 runSearch
 portScan
-# notifySlack
