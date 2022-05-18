@@ -58,15 +58,15 @@ gatherSubdomains(){
 	notify "Done, next."
 
 	notify "Starting amass"
-	#"$GOBIN"/amass enum -silent -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt | "$GOBIN"/anew -q "$SUBS"/amass-anew.txt &
-	#pid=$!
-	#echo "waiting 20 minutes for amass"
-	#sleep 1200
-	#kill $pid
+	"$GOBIN"/amass enum -silent -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt | "$GOBIN"/anew -q "$SUBS"/amass-anew.txt &
+	pid=$!
+	echo "waiting 10 minutes for amass"
+	sleep 600
+	kill $pid
 
 	# testing
-	"$GOBIN"/amass enum -silent -active -brute -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt
-	notify "Done, next."
+	#"$GOBIN"/amass enum -silent -active -brute -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt
+	#notify "Done, next."
 
 	# Add altdns to expand scope of subdomain search
 
@@ -75,7 +75,7 @@ gatherSubdomains(){
 
 	notify "Resolving subdomains.."
 	cat "$SUBS"/subdomains | sort -u | "$GOBIN"/shuffledns -silent -d "$domain" -r "$IPS"/resolvers.txt > "$SUBS"/alive_subdomains.txt
-	
+
 	notify "Getting alive hosts.."
 	cat "$SUBS"/alive_subdomains.txt | "$GOBIN"/httprobe -p http:81 -p http:3000 -p https:3000 -p http:3001 -p https:3001 -p http:8000 -p http:8080 -p https:8443 -c 50 | "$GOBIN"/anew -q "$SUBS"/hosts.txt
 	notify "Done."

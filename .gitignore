@@ -1,6 +1,7 @@
 # Custom
 output/
 .DS_Store
+modules/recon/configs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

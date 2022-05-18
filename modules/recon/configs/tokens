@@ -1,4 +1,4 @@
-export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXXX/XXXX"
 export findomain_spyse_token=""
 export findomain_virustotal_token=""
 export findomain_securitytrails_token=""
