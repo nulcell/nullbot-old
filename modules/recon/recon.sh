@@ -54,19 +54,16 @@ gatherSubdomains(){
 	notify "Done, next."
 
 	notify "Starting subfinder"
-	"$GOBIN"/subfinder -silent -d "$domain" -all -config "$BASE"/nullbot/modules/recon/configs/config.yaml -o "$SUBS"/subfinder.txt 1>/dev/null 2>/dev/null
+	"$GOBIN"/subfinder -silent -d "$domain" -all -config "$BASE"/nullbot/configs/subfinder_config.yaml -o "$SUBS"/subfinder.txt 1>/dev/null 2>/dev/null
 	notify "Done, next."
 
 	notify "Starting amass"
-	"$GOBIN"/amass enum -silent -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt | "$GOBIN"/anew -q "$SUBS"/amass-anew.txt &
+	"$GOBIN"/amass enum -silent -d "$domain" -config "$BASE"/nullbot/configs/amass_config.ini -o "$SUBS"/amass.txt | "$GOBIN"/anew -q "$SUBS"/amass-anew.txt &
 	pid=$!
 	echo "waiting 10 minutes for amass"
 	sleep 600
 	kill $pid
-
-	# testing
-	#"$GOBIN"/amass enum -silent -active -brute -d "$domain" -config "$BASE"/nullbot/modules/recon/configs/config.ini -o "$SUBS"/amass.txt
-	#notify "Done, next."
+	notify "Done, next."
 
 	# Add altdns to expand scope of subdomain search
 
@@ -274,7 +271,8 @@ function trap_ctrlc ()
 # when signal 2 (SIGINT) is received
 trap "trap_ctrlc" 2
 
-source ${BASE}/nullbot/modules/recon/configs/tokens
+# source ${BASE}/nullbot/modules/recon/configs/tokens
+source ${BASE}/nullbot/.env
 
 checkArguments
 checkDirectories
