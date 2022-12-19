@@ -203,12 +203,12 @@ runSearch(){
 	sleep 5
 	
 	# Using interlace and ffuf
-	# interlace -tL "$SUBS"/hosts.txt -threads 5 --silent -c ""$GOBIN"/ffuf -u _target_/FUZZ -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -fc 404,400,500 -or -o ffuftest.txt -v 2>/dev/null | grep URL | cut -d '|' -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/interlace.txt"
+	# interlace -tL "$SUBS"/hosts.txt -threads 5 --silent -c ""$GOBIN"/ffuf -u _target_/FUZZ -w "$BASE"/nullbot/wordlists/fuzz.txt -fc 404,400,500 -or -o ffuftest.txt -v 2>/dev/null | grep URL | cut -d '|' -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/interlace.txt"
 
 	# slower alternative
-	#python3 ~/tools/dirsearch/dirsearch.py -u "$domain" -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -F --full-url --no-color --quiet --scheme=https | "$GOBIN"/anew -q "$DIRSEARCH"/basic.txt
-	#"$GOBIN"/ffuf -u https://"$domain"/FUZZ -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -fc 404,400,500 -or -o ffuftest.txt -v 2>/dev/null | grep URL | cut -d '|' -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
-	"$GOBIN"/ffuf -u https://"$domain"/FUZZ -w "$BASE"/nullbot/modules/recon/wordlists/fuzz.txt -fc 404,400,500 -v 2>/dev/null | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
+	#python3 ~/tools/dirsearch/dirsearch.py -u "$domain" -w "$BASE"/nullbot/wordlists/fuzz.txt -F --full-url --no-color --quiet --scheme=https | "$GOBIN"/anew -q "$DIRSEARCH"/basic.txt
+	#"$GOBIN"/ffuf -u https://"$domain"/FUZZ -w "$BASE"/nullbot/wordlists/fuzz.txt -fc 404,400,500 -or -o ffuftest.txt -v 2>/dev/null | grep URL | cut -d '|' -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
+	"$GOBIN"/ffuf -u https://"$domain"/FUZZ -w "$BASE"/nullbot/wordlists/fuzz.txt -fc 404,400,500 -v 2>/dev/null | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
 
 	#notify "Combining results.."
 	#cat "$DIRSEARCH"/*.txt | cut -d "-" -f 3 | "$GOBIN"/anew -q "$DIRSEARCH"/result.txt
